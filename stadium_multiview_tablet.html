@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8" /> 
+        <meta name="viewport" content=" initial-scale=0.5, user-scalable=no">
+        <link rel="stylesheet" type="text/css" href="stadium_multiview_tablet.css" />
+    </head>    
+    <body>
+        <div id="rectangle_div"></div>
+        <div id="vid0_tile">
+            <video controls loop tabindex="0" onfocus="process_video_items(0)" onmouseover="process_video_items(0)" onkeydown="monitor_video_keydown(0)" class="video_tile" id="div_vid_tile_id_0">
+                <source id="div_vid_tile_src_id_0" src="videos/stadium_tablet/BroncosRams_130824_00451346_4K_29_97Hz_cropped_web_optimized.mp4" type="video/mp4"/>  
+            </video>
+            <div id="stitch_toggle"></div>
+        </div>
+       
+        <div id="vid1_tile">
+            <video controls loop tabindex="0" onfocus="process_video_items(1)" onmouseover="process_video_items(1)" onkeydown="monitor_video_keydown(1)" class="video_tile" id="div_vid_tile_id_1">
+                <source id="div_vid_tile_src_id_1" src="videos/stadium_tablet/270/10.mp4" type="video/mp4"/>
+            </video>
+        </div>       
+      
+        <div id="vid2_tile">
+            <video controls loop tabindex="0" onfocus="process_video_items(2)" onmouseover="process_video_items(2)" onkeydown="monitor_video_keydown(2)" class="video_tile" id="div_vid_tile_id_2">
+                <source id="div_vid_tile_src_id_2" src="videos/stadium_tablet/270/14.mp4" type="video/mp4"/>
+            </video>
+        </div> 
+        
+        <div id="vid3_tile">
+            <video controls loop tabindex="0" onfocus="process_video_items(3)" onmouseover="process_video_items(3)" onkeydown="monitor_video_keydown(3)" class="video_tile" id="div_vid_tile_id_3">
+                <source id="div_vid_tile_src_id_3" src="videos/stadium_tablet/270/11.mp4" type="video/mp4"/>
+            </video>
+        </div> 
+        
+        <div id="vid4_tile">
+            <video controls loop tabindex="0" onfocus="process_video_items(4)" onmouseover="process_video_items(4)" onkeydown="monitor_video_keydown(4)" class="video_tile" id="div_vid_tile_id_4">
+                <source id="div_vid_tile_src_id_4" src="videos/stadium_tablet/270/12.mp4" type="video/mp4"/>
+            </video>
+        </div> 
+        
+        <div id="vid5_tile">
+            <video controls loop tabindex="0" onfocus="process_video_items(5)" onmouseover="process_video_items(5)" onkeydown="monitor_video_keydown(5)" class="video_tile" id="div_vid_tile_id_5">
+                <source id="div_vid_tile_src_id_5" src="videos/stadium_tablet/540/0.mp4" type="video/mp4"/>
+            </video>
+        </div> 
+ 
+        <div id="vid_area_tile" style="display:none;"><p id="text"> Touch here to exit full screen mode</p></div> 
+        
+        <div id="menu_items"></div>
+
+        <div id="preview_div"></div>
+
+        <div id="div_tiles" style="display:none;" ></div>
+
+        <div id="footer" style="display:none;" ></div>
+
+        <div id="full_screen_video"></div>
+      
+        <script src='lib/jquery-1.10.2.min.js'></script>
+        <script src='lib/jquery-ui.min.js'></script>
+        <script src='lib/jquery.ui.touch-punch.min.js'></script>
+        <script src='data.js'></script>
+        <script src='stadium_multiview_tablet.js'></script>    
+        <script src='common.js'></script>
+    </body>    
+</html>

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8" /> 
+        <meta name="viewport" content=" initial-scale=0.5, user-scalable=no">
+        <link rel="stylesheet" type="text/css" href="stadium_quad_tablet.css" />
+    </head>    
+    <body>
+        <div id="vid0_tile">
+            <video controls loop tabindex="0" onfocus="process_video_items(0)" onmouseover="process_video_items(0)" onkeydown="monitor_video_keydown(0)" class="video_tile" id="div_vid_tile_id_0">
+                <source id="div_vid_tile_src_id_0" src="videos/stadium_tablet/270/0.mp4" type="video/mp4"/> 
+            </video>
+            <div id="vol_0"><img id="vol_0_img" src=""></div>
+        </div>
+       
+        <div id="vid1_tile">
+            <video controls loop tabindex="0" onfocus="process_video_items(1)" onmouseover="process_video_items(1)" onkeydown="monitor_video_keydown(1)" class="video_tile" id="div_vid_tile_id_1">
+                <source id="div_vid_tile_src_id_1" src="videos/stadium_tablet/270/4.mp4" type="video/mp4"/>
+            </video>
+            <div id="vol_1"></div>
+        </div>       
+
+      
+        <div id="vid2_tile">
+            <video controls loop tabindex="0" onfocus="process_video_items(2)" onmouseover="process_video_items(2)" onkeydown="monitor_video_keydown(2)" class="video_tile" id="div_vid_tile_id_2">
+                <source id="div_vid_tile_src_id_2" src="videos/stadium_tablet/270/5.mp4" type="video/mp4"/>
+            </video>
+            <div id="vol_2"></div>
+        </div> 
+        
+        <div id="vid3_tile">
+            <video controls loop tabindex="0" onfocus="process_video_items(3)" onmouseover="process_video_items(3)" onkeydown="monitor_video_keydown(3)" class="video_tile" id="div_vid_tile_id_3">
+                <source id="div_vid_tile_src_id_3" src="videos/stadium_tablet/270/6.mp4" type="video/mp4"/>
+            </video>
+            <div id="vol_3"></div>
+        </div> 
+       
+        <div id="vid_area_tile" style="display:none;"><p id="text"> Touch here to exit full screen mode</p></div> 
+        
+        <div id="menu_items"></div>
+
+        <div id="preview_div"></div>
+     
+        <div id="div_tiles" ></div>
+
+        <div id="footer" style="display:none;" ></div>
+
+        <div id="full_screen_video"></div>
+      
+        <script src='lib/jquery-1.10.2.min.js'></script>
+        <script src='lib/jquery-ui.min.js'></script>
+        <script src='lib/jquery.ui.touch-punch.min.js'></script>
+        <script src='data.js'></script>
+        <script src='SonyTV.js'></script>
+        <script src='stadium_quad_tablet.js'></script>    
+        <script src='common.js'></script>
+    </body>    
+</html>

@@ -1,0 +1,1 @@
+C:\xampp\htdocs\4K_stadium\feleven.exe "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe --args --allow-file-access-from-files file:///C:/xampp/htdocs/4K_stadium/stadium_multiview_tv.html" 

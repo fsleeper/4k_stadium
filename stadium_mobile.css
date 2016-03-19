@@ -1,0 +1,137 @@
+* {margin: 0; padding: 0;}
+
+html, body{
+    background-image: url(image/phoneapp_bgnd.jpg);
+    background-repeat: no-repeat;
+    background-color: black; 
+    max-width: 100%;
+    max-height: 100%;
+    overflow: hidden;
+
+/*    background-size: cover; 
+    background-size: 4096px 2160px; */
+}
+
+@font-face { 
+	font-family: "SST-Condensed.otf"; 
+	src: url("fonts/SST-Condensed.otf"); 
+}
+
+@font-face { 
+        font-family: "SST-Light.ttf";
+        src: url("fonts/SST-Light.ttf");
+}
+    
+@font-face { 
+        font-family: "SST-Heavy.ttf";
+        src: url("fonts/SST-Heavy.ttf");
+}
+
+video{
+    position: absolute;
+    
+/*    opacity: 1; */
+}
+
+.info_text{
+    font-family: "SST-Light.ttf";
+    text-align: left;
+    margin-left: 50px; text-decoration: none; padding: 30px 100px 10px 70px;
+    background-color: none; font-size: 450%; color: white;
+    font-weight: 600; 
+    pointer-events: none;
+}    
+
+#vol_0, #vol_1, #vol_2, #vol_3, #vol_4{
+    position: absolute;
+    background-size: contain;
+    left: 0px;
+    top: 90px;
+    width: 80px;
+    height: 80px;
+    background-image: url(image/phoneapp_soundoff.png);
+    background-repeat: no-repeat;
+    pointer-events: none;
+/*    z-index: 50000; */
+}
+
+/*
+#vol_0{
+    background-image: url(image/speaker_icon_on.png);
+    background-repeat: no-repeat;
+}
+
+#vol_1, #vol_2, #vol_3{
+    background-image: url(image/speaker_icon_on.png);
+    background-repeat: no-repeat;
+}
+*/
+
+.prog_tile{
+    position: absolute;
+    background-image: url(image/phoneapp_bgrndtile.png);
+    width: 1080px;
+    height: 227px;
+    background-repeat: no-repeat;
+}
+
+
+#prog0_tile {
+    left:   0px; 
+    top:    420px; 
+}
+
+#prog1_tile {
+    left:   0px; 
+    top:    657px; 
+}
+
+#prog2_tile {
+    left:   0px; 
+    top:    894px; 
+}
+
+#prog3_tile {
+    left:   0px; 
+    top:    1131px; 
+}
+
+#prog4_tile {
+    left:   0px; 
+    top:    1368px; 
+}
+
+#vid0_tile {
+    position: absolute;
+    left:   40px; 
+    top:    40px; 
+    width:  1280px; 
+    height: 720px; 
+    background-color: black;
+}
+
+#div_vid_tile_id_0{
+  width: 0;
+  height: 0;
+}
+
+#div_vid_tile_id_1{
+  width: 100%;
+  opacity: 1;
+}
+
+#div_vid_tile_id_2{
+  width: 100%;
+  opacity: 1;
+}
+
+#div_vid_tile_id_3{
+  width: 100%;
+  opacity: 1;
+}
+
+
+
+
+
+
