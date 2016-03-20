@@ -1,3 +1,8 @@
+
+// Event and KeyCode are initialized from common.js once we know the page/scripts are loaded
+var Event;
+var KeyCode;
+
 var g_video_item = 0;
 var g_menu_item = 0;
 var g_tile_item = 0;
@@ -6,36 +11,41 @@ var socket = null;
 var g_vid_full_screen = 0;
 var g_current_time = 0;
 var divider_counter = 0;
+var pagekeymap;							// Initialized with the list of keypresses that occur across the page in general and associates with their handler
 
-$(document).ready(() => {
-    init();
-});
+function playVideos() {
+	for (var idx = 0; idx < 4; idx++) {
+		var video = findVideo(idx);
+		video.play();
+	}
+}
+
+function findMap(map, code) { 
+	return map.key === code;
+}
 
 function init() {
+	pagekeymap = [
+		{key:KeyCode.ToggleFullScreen, 	func:toggleFullScreen},
+		{key:KeyCode.ReloadPage, 		func:() => { location.reload(); }},
+		{key:KeyCode.PlayVideos, 		func:playVideos},
+		{key:KeyCode.ChangeDivider,		func:change_divider}
+	];
+
     socket = new WebSocket('ws://' + websocket_server_ip + ':9000/');
     console.log("websocket server IP:" + websocket_server_ip);
 
     socket.addEventListener("message", onMessage, false);
 
-    document.addEventListener("keydown", function(e) {
-        switch (e.keyCode) {
-            case 70: //'f' - full screen
-                toggleFullScreen();
-                break;
-            case 82: //'r' - reload
-                location.reload();
-                break;
-            case 65: //'a'
-                for (var idx = 0; idx < 6; idx++) {
-                    var video = findVideo(idx);
-                    video.play();
-                }
-                break;
-            case 66: //'b' - Change divider
-                location.reload();
-                break;
-        }
-    }, false);
+	$(document).keydown((e) => {
+		// Figure out what the keypress was
+		var keyValue = getKeyValue(e);
+		// Find the function mapped to the keypress
+		var map = pagekeymap.find((e,i,a) => findMap(e, keyValue));
+		if(map)
+			// Call the function
+			map.func(map.arg);
+	});
 
     var img_tile_0 = findVideo("0");
     img_tile_0.focus();
@@ -47,7 +57,7 @@ function init() {
     vid_toggle_mute(0); //unmute vid 0  
     toggle_all(true); //start playing all videos
 
-    window.setInterval(send_videoStatus, 1000);
+    window.setInterval(send_videoStatus, 2000);
 }
 
 // ******************************************************************
@@ -63,11 +73,14 @@ function send_videoStatus() {
     // For each video found, send the name and current position of each video
     for (var idx = 0; idx < tiles.length; idx++) {
         var video = tiles[idx];
-        var videoName = video.id.replace(VIDEO_BASE_TAG, "");
-        console.log("videoCurrentTime: " + video.currentTime + "  Name:" + videoName);
+        var videoTile = video.id.replace(VIDEO_BASE_TAG, "");
+        console.log("videoCurrentTime: " + video.currentTime + "  Name:" + videoTile);
+		var srcitems = video.src.split("/");
+		
         var msg = {
-            message: videoName,
+            message: videoTile,
             videoPosition: video.currentTime,
+			videoName: srcitems[srcitems.length-1].replace(".mp4",""),
             color: Event.seek_time
         };
         send_msg(msg);
@@ -79,23 +92,11 @@ function change_divider() {
     var divider_name;
 
     switch (divider_counter) {
-        case 0:
-            divider_name = "image/FrameDivider_wLogo_QuadView.png";
-            break;
-        case 1:
-            divider_name = "image/FrameDividerGold_QuadView.png";
-            break;
-        case 2:
-            divider_name = "image/FrameDividerRed_QuadView.png";
-            break;
-        case 3:
-            divider_name = "image/FrameDividerGray_QuadView.png";
-            break;
-        case 4:
-            divider_name = "image/FrameDivider_QuadView.png";
-            break;
-        default:
-            break;
+        case 0: divider_name = "image/FrameDivider_wLogo_QuadView.png"; break;
+        case 1: divider_name = "image/FrameDividerGold_QuadView.png"; break;
+        case 2: divider_name = "image/FrameDividerRed_QuadView.png"; break;
+        case 3: divider_name = "image/FrameDividerGray_QuadView.png"; break;
+        case 4: divider_name = "image/FrameDivider_QuadView.png"; break;
     }
 
     divider_item.style.backgroundImage = "url(" + divider_name + ")";
@@ -155,15 +156,9 @@ function onMessage(evt) {
     console.log("tv receive:{0} {1} {2}".format(msg.message, msg.name, msg.color));
 
     switch (msg.color) {
-        case Event.video_events2:
-            monitor_video_message(msg.message, msg.name);
-            break;
-        case Event.dragdrop2:
-            monitor_touch_message(msg);
-            break;
-        case Event.stitch_split_8k:
-            monitor_video_message(4, msg.name);
-            break;
+        case Event.video_events2: monitor_video_message(msg.message, msg.name); break;
+        case Event.dragdrop2: monitor_touch_message(msg); break;
+        case Event.stitch_split_8k: monitor_video_message(4, msg.name); break;
         case Event.seek_time:
             console.log("recvd: " + msg.name);
             g_current_time = msg.name;
@@ -202,8 +197,6 @@ function toggleFullScreen() {
 }
 
 function show_description(x) {
-
-    var image;
     var tile_name;
 
     tile_name = "div_tile_img_id_" + x;
@@ -211,11 +204,7 @@ function show_description(x) {
     var img_tile = document.getElementById(tile_name);
     img_tile.focus();
 
-    if ((x % 2) == 0) {
-        image = 'footer_01.jpg';
-    } else {
-        image = 'footer_02.jpg';
-    }
+    var image = ((x % 2) == 0) ? 'footer_01.jpg' : 'footer_02.jpg';
 
     description_HTML = '<img id="footer_img" src="./image/' + image + '" alt="description" />'
     document.getElementById("footer").innerHTML = description_HTML;
@@ -234,8 +223,6 @@ function monitor_video_message(x, key) {
     g_video_item = x;
 
     switch (key) {
-        case 73: // 'i'
-            break;
         case 65: //'a'
             toggle_all(true);
             break;
@@ -258,32 +245,16 @@ function monitor_video_message(x, key) {
             }
             break;
         case 37: //'left'
-            if ((x == 1) || (x == 3)) {
-                next_video = x - 1;
-            } else {
-                next_video = x;
-            }
+            next_video = ((x == 1) || (x == 3)) ? x - 1 : x;
             break;
         case 38: //'up'
-            if ((x < 2)) {
-                next_video = x;
-            } else {
-                next_video = x - 2;
-            }
+            next_video = ((x < 2)) ? x : x - 2;
             break;
         case 39: //'right'
-            if ((x == 0) || (x == 2)) {
-                next_video = x + 1;
-            } else {
-                next_video = x;
-            }
+            next_video = ((x == 0) || (x == 2)) ? x + 1 : x;
             break;
         case 40: //'down'
-            if ((x == 0) || (x == 1)) {
-                next_video = x + 2;
-            } else {
-                next_video = x;
-            }
+            next_video = ((x == 0) || (x == 1)) ? x + 2 : x;
             break;
     }
 
@@ -305,8 +276,6 @@ function monitor_video_keydown(x) {
     remove_detail_pop_up();
 
     switch (window.event.keyCode) {
-        case 73: // 'i'
-            break;
         case 65: //'a'
             toggle_all(true);
             break;
@@ -329,32 +298,16 @@ function monitor_video_keydown(x) {
             }
             break;
         case 37: //'left'
-            if ((x == 1) || (x == 3)) {
-                next_video = x - 1;
-            } else {
-                next_video = x;
-            }
+            next_video = ((x == 1) || (x == 3)) ? x - 1 : x;
             break;
         case 38: //'up'
-            if ((x < 2)) {
-                next_video = x;
-            } else {
-                next_video = x - 2;
-            }
+            next_video = ((x < 2)) ? x : x - 2;
             break;
         case 39: //'right'
-            if ((x == 0) || (x == 2)) {
-                next_video = x + 1;
-            } else {
-                next_video = x;
-            }
+            next_video = ((x == 0) || (x == 2)) ? x + 1 : x;
             break;
         case 40: //'down'
-            if ((x == 0) || (x == 1)) {
-                next_video = x + 2;
-            } else {
-                next_video = x;
-            }
+            next_video = ((x == 0) || (x == 1)) ? x + 2 : x;
             break;
     }
 
@@ -406,13 +359,7 @@ function toggle_full_screen_video(x, fs_mode) {
 
 function change_source_full_screen(x) {
     var video = findVideo("7");
-    var str_trim;
-
-    if (x == 4) {
-        str_trim = 21;
-    } else {
-        str_trim = 22;
-    }
+    var str_trim = (x == 4) ? 21 : 22;
 
     var video_tile = findVideo(x);
     var video_src = video_tile.getAttribute("src");
@@ -464,24 +411,14 @@ function monitor_menu_keydown(x) {
     remove_detail_pop_up();
 
     switch (window.event.keyCode) {
-        case 13: // 'Enter'
-            break;
         case 37: //'left'
-            if (x > 0) {
-                next_item = x - 1;
-            } else {
-                next_item = x;
-            }
+            next_item = (x > 0) ? x - 1 : x;
             break;
         case 38: //'up'
             next_item = 200;
             break;
         case 39: //'right'
-            if (x < 4) {
-                next_item = x + 1;
-            } else {
-                next_item = x;
-            }
+            next_item = (x < 4) ? x + 1 : x;
             break;
         case 40: //'down'
             next_item = 100; //move down to image tiles
@@ -573,21 +510,13 @@ function monitor_tile_key_down(x) {
             show_full_screen_video(x, g_video_full_screen_mode);
             break;
         case 37: //'left'
-            if (x > 0) {
-                next_tile = x - 1;
-            } else {
-                next_tile = x;
-            }
+            next_tile = (x > 0) ? x - 1 : x;
             break;
         case 38: //'up'
             next_tile = 100; //go to menu items
             break;
         case 39: //'right'
-            if (x < 9) {
-                next_tile = x + 1;
-            } else {
-                next_tile = x;
-            }
+            next_tile = (x < 9) ? x + 1 : x;
             break;
         case 40: //'down'
             next_tile = x;
@@ -615,21 +544,10 @@ function remove_detail_pop_up() {
 function show_detail_pop_up(x) {
     var image_name;
     switch (x) {
-        case 0:
-            image_name = 'details_0.jpg';
-            break;
-        case 1:
-            image_name = 'details_1.jpg';
-            break;
-        case 2:
-            image_name = 'details_2.jpg';
-            break;
-        case 9:
-            image_name = 'details_9.jpg';
-            break;
-        default:
-            return;
-            break;
+        case 0: image_name = 'details_0.jpg'; break;
+        case 1: image_name = 'details_1.jpg'; break;
+        case 2: image_name = 'details_2.jpg'; break;
+        case 9: image_name = 'details_9.jpg'; break;
     }
 
     detail_HTML = '<div class="preview_temp_load"><img id="details_img" src="./image/' + image_name + '" border="0"></div>';
@@ -640,18 +558,9 @@ function show_detail_pop_up(x) {
 function show_full_screen_video(x, fs_mode) {
     var new_video;
     switch (x) {
-        case 0:
-            new_video = "wildalaska";
-            break;
-        case 1:
-            new_video = "dexter";
-            break;
-        case 9:
-            new_video = "walkingdead";
-            break;
-        default:
-            return;
-            break;
+        case 0: new_video = "wildalaska"; break;
+        case 1: new_video = "dexter"; break;
+        case 9: new_video = "walkingdead"; break;
     }
 
     fs_video_HTML = '<video id="full_video" loop >' +
@@ -680,3 +589,10 @@ function show_full_screen_video(x, fs_mode) {
         fs.innerHTML = '';
     }
 }
+
+$(document).ready(() => {
+	Event = CommonEvent;
+	KeyCode = CommonKeyCode;
+
+    init();
+});

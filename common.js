@@ -32,51 +32,60 @@ function getValue(object, property) {
 		return object[property];
 	return null;
 }
-/*
-var KeyCode = {
-	'1': 49,
-	'2': 50,
-	'3': 51,
-	'4': 52,
-	'5': 53,
-	'6': 54,
-	'7': 55,
-	'8': 56,
-	'9': 57,
-	a: 65,
-	b: 66,
-	c: 67,
-	d: 68,
-	e: 69,
-	f: 70,
-	g: 71,
-	h: 72,
-	i: 73,
-	j: 74,
-	k: 75,
-	l: 76,
-	m: 77,
-	n: 78,
-	o: 79,
-	p: 80,
-	q: 81,
-	r: 82,
-	s: 83,
-	t: 84,
-	u: 85,
-	v: 86,
-	w: 87,
-	x: 88,
-	y: 89,
-	z: 90,
-	left: 37,
-	up: 38,
-	right: 39,
-	down: 40
-};
-*/
 
-var Event = {
+// send the event if possible so it can determine what the event type is
+// or send just the code itself
+function getKeyCode(sourceCode){
+	var unicode = sourceCode;
+
+	// figure out what type of object was passed
+    var evtobj=window.event? event : e; //distinguish between IE's explicit event object (window.event) and Firefox's implicit.
+
+	// OK, so it's POSSIBLY the event, let's see...
+	if(evtobj.charCode || evtobj.keyCode)
+		// well it was an event so get the code from the event
+		unicode=evtobj.charCode? evtobj.charCode : evtobj.keyCode;
+
+	return unicode;
+}
+
+// send the event if possible so it can determine what the event type is
+// or send just the code itself
+function getKeyValue(sourceCode, caseSensitive){
+	var code = getKeyCode(sourceCode);
+
+	// try to look up the key now
+    var actualkey=String.fromCharCode(code);
+
+	if(actualkey == null)
+		return null;
+
+	return caseSensitive ? actualkey : actualkey.toLowerCase();
+}
+
+var CommonKeyCode = {
+	ChangeToHDMI1: 		'1',
+	ChangeToHDMI2: 		'2',
+	ChangeToHDMI3: 		'3',
+	ChangeToHDMI4: 		'4',
+	MuteAudios: 		'5',
+	PlayVideos: 		'a',
+	ToggleAllPause: 	'a',
+	ChangeDivider: 		'b',
+	ToggleFullScreen: 	'f',
+	GetInformation:		'i',
+	ToggleMute:			'm',
+	TogglePause:		'p',
+	ReloadPage: 		'r',
+	SwitchVideo:		's',
+	ShowFullScreenVideo:'s',
+	Left: 				'%', 	// 37,
+	Up: 				'&', 	// 38,
+	Right: 				"'", 	// 39,
+	Down: 				'(' 	// 40
+};
+
+var CommonEvent = {
 	video_events2: "video_events2",
 	video_events: 'video_events',
 	stitch_events: 'stitch_events',
