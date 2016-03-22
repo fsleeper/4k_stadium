@@ -102,6 +102,22 @@ function onMessage(evt) {
 			}
 			video.currentTime = msg.videoPosition;
 			break;
+	case Event.BroadcastServerStatus:
+		for(var idx in msg.videos){
+			var item = msg.videos[idx];
+			var video = findVideo(item);
+			if(video && !video.paused) {
+				var newVideo = "{1}videos/stadium_tablet/270/{0}.mp4".format(item.videoName, getSiteRoot());
+				var src = video.currentSrc;
+				if(src !== newVideo) {
+					console.log("New Video: " + item.videoName + "  Curr Video: " + src.substring(src.length-10));
+					video.src = newVideo;
+					video.play();				
+				}
+				video.currentTime = item.videoPosition;
+			}
+		}
+		break;
 	}
 }
 
@@ -155,6 +171,11 @@ function init() {
 		{key:KeyCode.ChangeToHDMI4, 	func:test_tv_http_control, arg:"HDMI4"},
 		{key:KeyCode.MuteAudios, 		func:muteAudios}
 	];
+
+	var videos = $('video');
+	videos.focus(function(){process_video_items($(this));});
+	videos.mouseover(function(){process_video_items($(this));});
+	videos.keydown(function(){monitor_video_keydown($(this));});
 	
 	socket = new WebSocket('ws://' + websocket_server_ip + ':9000/');
 	console.log("websocket server IP:" + websocket_server_ip);
@@ -553,12 +574,13 @@ function show_description(x) {
 	img_tile.focus();
 }
 
-function process_video_items(x) {
-	var menu_element = findVideo(x);
-	menu_element.focus();
+function process_video_items(control) {
+	control.focus();
 }
 
-function monitor_video_keydown(x) {
+function monitor_video_keydown(control) {
+	var x = control.attr("data-panelNumber");
+
 	var next_video = x;
 
 	remove_detail_pop_up();

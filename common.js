@@ -1,5 +1,6 @@
 
 var VIDEO_BASE_TAG = "div_vid_tile_id_";
+var MENU_BASE_TAG = "menu_item_";
 
 String.prototype.format = function() {
     var formatted = this;
@@ -17,6 +18,17 @@ function getId(msg) {
 function getVideoElementId(msg) {
 	var value =  VIDEO_BASE_TAG+getId(msg);
 	return value;
+}
+
+function getMenuElementId(msg) {
+	var value =  MENU_BASE_TAG+getId(msg);
+	return value;
+}
+
+function findMenu(msg){
+	var search = "#" + getMenuElementId(msg);
+	var value = $(search);
+	return (value.length) ? value[0]: null;
 }
 
 function findVideo(msg){
@@ -86,12 +98,13 @@ var CommonKeyCode = {
 };
 
 var CommonEvent = {
-	video_events2: "video_events2",
-	video_events: 'video_events',
-	stitch_events: 'stitch_events',
-	dragdrop: 'dragdrop',
-	dragdrop2: 'dragdrop2',
-	stitch_split_8k: 'stitch_split_8k',
-	seek_time: 'seek_time',
-	tile_events: 'tile_events'
+	BroadcastServerStatus: 	"BroadcastServerStatus",
+	video_events2: 			"video_events2",
+	video_events: 			'video_events',
+	stitch_events: 			'stitch_events',
+	dragdrop: 				'dragdrop',
+	dragdrop2: 				'dragdrop2',
+	stitch_split_8k: 		'stitch_split_8k',
+	seek_time: 				'seek_time',
+	tile_events: 			'tile_events'
 }

@@ -57,7 +57,7 @@ function init() {
     vid_toggle_mute(0); //unmute vid 0  
     toggle_all(true); //start playing all videos
 
-    window.setInterval(send_videoStatus, 2000);
+    window.setInterval(send_AllVideoStatus, 1000);
 }
 
 // ******************************************************************
@@ -85,6 +85,33 @@ function send_videoStatus() {
         };
         send_msg(msg);
     }
+}
+
+function send_AllVideoStatus() {
+    // Find the current videos
+    var tiles = $('.vid_tiles:visible').find('.video_tile');
+
+	var msg = {
+		action: Event.BroadcastServerStatus,
+		color: Event.BroadcastServerStatus,	// legacy name (lame)
+		videos: []
+	};
+
+    // For each video found, send the name and current position of each video
+    for (var idx = 0; idx < tiles.length; idx++) {
+        var video = tiles[idx];
+        var videoTile = video.id.replace(VIDEO_BASE_TAG, "");
+        console.log("videoCurrentTime: " + video.currentTime + "  Name:" + videoTile);
+		var srcitems = video.src.split("/");
+		
+        var videoInfo = {
+            message: videoTile,
+            videoPosition: video.currentTime,
+			videoName: srcitems[srcitems.length-1].replace(".mp4",""),
+        };
+		msg.videos.push(videoInfo);
+    }
+	send_msg(msg);
 }
 
 function change_divider() {
