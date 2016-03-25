@@ -13,7 +13,7 @@
         </div>
         <div id="rectangle_div" style="display:none" ></div>
         <div id="id_vid0" class="vid_tiles vid0">
-            <video loop tabindex="0" onfocus="process_video_items(0)" onmouseover="process_video_items(0)" onkeydown="monitor_video_keydown(0)" class="video_tile" id="div_vid_tile_id_0">
+            <video loop tabindex="0" data-panelNumber="0" class="video_tile handlevideo" id="div_vid_tile_id_0">
                     <source id="div_vid_tile_src_id_0" src="videos/stadium_tv/4K/BroncosRams_130824_00451346_3840x1080_29_97Hz_30Mbs.mp4" type="video/mp4"/>
             </video>
         </div>
@@ -22,31 +22,31 @@
             Your browser does not support the HTML5 canvas tag.</canvas>
 
         <div id="id_vid1" class="vid_tiles vid1">
-            <video loop tabindex="0" onfocus="process_video_items(1)" onmouseover="process_video_items(1)" onkeydown="monitor_video_keydown(1)" class="video_tile" id="div_vid_tile_id_1">
+            <video loop tabindex="0" data-panelNumber="1" class="video_tile handlevideo" id="div_vid_tile_id_1">
                 <source id="div_vid_tile_src_id_1" src="videos/stadium_tv/720/10.mp4" type="video/mp4"/>
             </video> 
         </div>       
       
         <div id="id_vid2" class="vid_tiles vid2">
-            <video loop tabindex="0" onfocus="process_video_items(2)" onmouseover="process_video_items(2)" onkeydown="monitor_video_keydown(2)" class="video_tile" id="div_vid_tile_id_2">
+            <video loop tabindex="0" data-panelNumber="2" class="video_tile handlevideo" id="div_vid_tile_id_2">
                 <source id="div_vid_tile_src_id_2" src="videos/stadium_tv/720/14.mp4" type="video/mp4"/>
             </video>
         </div> 
         
         <div id="id_vid3" class="vid_tiles vid3">
-            <video loop tabindex="0" onfocus="process_video_items(3)" onmouseover="process_video_items(3)" onkeydown="monitor_video_keydown(3)" class="video_tile" id="div_vid_tile_id_3">
+            <video loop tabindex="0" data-panelNumber="3" class="video_tile handlevideo" id="div_vid_tile_id_3">
                 <source id="div_vid_tile_src_id_3" src="videos/stadium_tv/720/11.mp4" type="video/mp4"/>
             </video>
         </div> 
         
         <div id="id_vid4" class="vid_tiles vid4">
-            <video loop tabindex="0" onfocus="process_video_items(4)" onmouseover="process_video_items(4)" onkeydown="monitor_video_keydown(4)" class="video_tile" id="div_vid_tile_id_4">
+            <video loop tabindex="0" data-panelNumber="4" class="video_tile handlevideo" id="div_vid_tile_id_4">
                 <source id="div_vid_tile_src_id_4" src="videos/stadium_tv/720/12.mp4" type="video/mp4"/>
             </video>
         </div> 
         
         <div id="id_vid5" class="vid_tiles vid5">
-            <video loop tabindex="0" onfocus="process_video_items(5)" onmouseover="process_video_items(5)" onkeydown="monitor_video_keydown(5)" class="video_tile" id="div_vid_tile_id_5">
+            <video loop tabindex="0" data-panelNumber="5" class="video_tile handlevideo" id="div_vid_tile_id_5">
                 <source id="div_vid_tile_src_id_5" src="videos/stadium_tv/720/0.mp4" type="video/mp4"/>
             </video>
         </div> 
@@ -63,17 +63,8 @@
             </video>
         </div> 
         
-        <div id="menu_items"></div>
-         
-        <div id="div_webview" style="display:none;">
-        </div>
+        <div id="div_webview" style="display:none;"></div>
         
-        <div id="preview_div"></div>
-        
-        <div id="img_tile" style="display:none;"></div>
-
-        <div id="div_tiles" style="display:none;"></div>
-
         <div id="footer" style="display:none;"></div>
 
         <div id="full_screen_video"></div>
@@ -84,7 +75,7 @@
         <script src='lib/jquery-ui.min.js'></script>
         <script src='lib/jquery.ui.touch-punch.min.js'></script>
         <script src='data.js'></script>
-        <script src='stadium_multiview_tv.js'></script>
         <script src='common.js'></script>
+        <script src='stadium_multiview_tv.js'></script>
     </body>    
 </html>

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html>
     <head>
         <meta charset="utf-8" /> 
@@ -7,47 +7,48 @@
     </head>    
     <body>
         <div id="vid0_tile">
-
-            <video controls loop 
-				data-panelNumber="0"
-				tabindex="0" 
-				class="video_tile" 
-				id="div_vid_tile_id_0">
+            <video controls loop data-panelNumber="0" tabindex="0" class="video_tile handlevideo" id="div_vid_tile_id_0">
                 <source id="div_vid_tile_src_id_0" src="videos/stadium_tv/720/Loading.mp4" type="video/mp4"/>
             </video>
             <div id="vol_0"><img id="vol_0_img" src=""></div>
         </div>
        
         <div id="vid1_tile">
-            <video controls loop data-panelNumber="1" tabindex="0" class="video_tile" id="div_vid_tile_id_1">
+            <video controls loop data-panelNumber="1" tabindex="0" class="video_tile handlevideo" id="div_vid_tile_id_1">
                 <source id="div_vid_tile_src_id_1" src="videos/stadium_tv/720/Loading.mp4" type="video/mp4"/>
             </video>
             <div id="vol_1"></div>
         </div>       
 
-      
         <div id="vid2_tile">
-            <video controls loop data-panelNumber="2" tabindex="0" class="video_tile" id="div_vid_tile_id_2">
+            <video controls loop data-panelNumber="2" tabindex="0" class="video_tile handlevideo" id="div_vid_tile_id_2">
                 <source id="div_vid_tile_src_id_2" src="videos/stadium_tv/720/Loading.mp4" type="video/mp4"/>
             </video>
             <div id="vol_2"></div>
         </div> 
 		
         <div id="vid3_tile">
-                <!--<source id="div_vid_tile_src_id_3" src="videos/stadium_tablet/270/6.mp4" type="video/mp4"/>-->
-            <video controls loop data-panelNumber="3" tabindex="0" class="video_tile" id="div_vid_tile_id_3">
+            <video controls loop data-panelNumber="3" tabindex="0" class="video_tile handlevideo" id="div_vid_tile_id_3">
                 <source id="div_vid_tile_src_id_3" src="videos/stadium_tv/720/Loading.mp4" type="video/mp4"/>
             </video>
             <div id="vol_3"></div>
         </div> 
        
-        <div id="vid_area_tile" style="display:none;"><p id="text"> Touch here to exit full screen mode</p></div> 
-        
-        <div id="menu_items"></div>
+        <div id="vid_area_tile" style="display:none;"><p id="text"> Touch here to exit full screen mode</p></div>
 
-        <div id="preview_div"></div>
-     
-        <div id="div_tiles" ></div>
+        <div id="menu_items">
+            <ul>
+                <li id="menu_item_0" tabindex="0" class="menuitem" data-panelNumber="0">Watch Now</li>
+                <li id="menu_item_1" tabindex="0" class="menuitem" data-panelNumber="1">Sports</li>
+                <li id="menu_item_2" tabindex="0" class="menuitem" data-panelNumber="2">Stats</li>
+                <li id="menu_item_3" tabindex="0" class="menuitem" data-panelNumber="3">Stadium</li>
+                <li id="menu_item_4" tabindex="0" class="menuitem" data-panelNumber="4">4K</li>
+                <li id="menu_item_5" tabindex="0" class="menuitem" data-panelNumber="5">Games</li>
+            </ul>
+        </div>
+
+        <div id="div_tiles">
+        </div>
 
         <div id="footer" style="display:none;" ></div>
 
@@ -58,7 +59,7 @@
         <script src='lib/jquery.ui.touch-punch.min.js'></script>
         <script src='data.js'></script>
         <script src='SonyTV.js'></script>
-        <script src='stadium_quad_tablet.js'></script>    
 		<script src='common.js'></script>
+        <script src='stadium_quad_tablet.js'></script>    
     </body>    
 </html>

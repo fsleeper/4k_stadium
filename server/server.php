@@ -19,6 +19,8 @@ $clients = array($socket);
 
 //start endless loop, so that our script doesn't stop
 while (true) {
+
+	
 	//manage multipal connections
 	$changed = $clients;
 	//returns the socket resources in $changed array
@@ -47,7 +49,6 @@ while (true) {
 		//check for any incomming data
 		while(socket_recv($changed_socket, $buf, 1024, 0) >= 1)
 		{
-
 			$received_text = unmask($buf); //unmask data
 			$tst_msg = json_decode($received_text); //json decode 
 			$response_text = mask(json_encode($tst_msg));

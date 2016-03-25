@@ -146,25 +146,20 @@ function toggle_all(e) {
 
 function onMessage(evt) {
     var msg = JSON.parse(evt.data); //PHP sends Json data
-    var type = msg.type; //message type
-    var umsg = msg.message; //vid tile
-    var uname = msg.name; //key
-    var ucolor = msg.color; //color
 
-    console.log("tv receive:" + umsg + " " + uname);
-    if (ucolor == Event.video_events2) {} else if (ucolor == Event.dragdrop2) {
+    var strmsg = JSON.stringify(msg);
+    console.log("tv receive:" + strmsg);
+
+    if (msg.action === Event.dragdrop2) {
         monitor_touch_message(msg);
     }
 }
 
 function monitor_touch_message(msg) {
-    var type = msg.type; //message type
-    var vid_tile = msg.message; //vid tile
-    var vid_src = msg.name; //new vid source
-    console.log("vid_tile: " + vid_tile + " parseInt: " + parseInt(vid_src, 10) + " vid_src: " + vid_src);
-    aud_toggle_source(vid_tile + 1, parseInt(vid_src, 10));
-    vid_toggle_mute(vid_tile + 1);
-    switch_stream(vid_tile + 1);
+    console.log("vid_tile: " + msg.message + " parseInt: " + parseInt(msg.name, 10) + " vid_src: " + msg.name);
+    aud_toggle_source(msg.message + 1, parseInt(msg.name, 10));
+    vid_toggle_mute(msg.message + 1);
+    switch_stream(msg.message + 1);
 }
 
 function toggleFullScreen() {
@@ -187,26 +182,6 @@ function toggleFullScreen() {
             document.webkitCancelFullScreen();
         }
     }
-}
-
-function show_description(x) {
-    var image;
-    var tile_name;
-
-    tile_name = "div_tile_img_id_" + x;
-
-    var img_tile = document.getElementById(tile_name);
-    img_tile.focus();
-
-    if ((x % 2) == 0) {
-        image = 'footer_01.jpg';
-    } else {
-        image = 'footer_02.jpg';
-    }
-
-    description_HTML = '<img id="footer_img" src="./image/' + image + '" alt="description" />'
-    document.getElementById("footer").innerHTML = description_HTML;
-    document.getElementById("footer").style.display = "block";
 }
 
 function process_video_items(x) {
@@ -292,8 +267,6 @@ function monitor_video_keydown(x) {
     var next_video = x;
 
     g_video_item = x;
-
-    remove_detail_pop_up();
 
     switch (window.event.keyCode) {
         case 73: // 'i'
@@ -427,7 +400,6 @@ function play_pause(x) {
 
 function monitor_menu_keydown(x) {
     var next_item = x;
-    remove_detail_pop_up();
 
     switch (window.event.keyCode) {
         case 13: // 'Enter'
@@ -530,15 +502,7 @@ function change_menu_item_highlight(x) {
 function monitor_tile_key_down(x) {
     var next_tile = x;
 
-    remove_detail_pop_up();
-
     switch (window.event.keyCode) {
-        case 73: // 'i'
-            show_detail_pop_up(x);
-            break;
-        case 83: // 's'
-            show_full_screen_video(x, g_video_full_screen_mode);
-            break;
         case 37: //'left'
             if (x > 0) {
                 next_tile = x - 1;

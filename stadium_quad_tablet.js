@@ -8,10 +8,6 @@
 }
 */
 
-// Event and KeyCode are initialized from common.js once we know the page/scripts are loaded
-var Event;
-var KeyCode;
-
 var g_video_item = 2;
 var g_menu_item = 0;
 var g_tile_item = 0;
@@ -27,10 +23,204 @@ var g_ps4_tile1 = false;
 var g_ps4_tile2 = false;
 var g_ps4_tile3 = false;
 var g_ps4_tv_input = false;
-var pagekeymap;							// Initialized with the list of keypresses that occur across the page in general and associates with their handler
+var newVid = null;
 
 var tv_set = {};
 tv_set.tv_4k_1 = SonyTV('http://192.168.1.28/sony/IRCC');
+
+var tileGroup0 =[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]; 		  //watch now
+var tileGroup1 =[10, 11, 12, 13, 14, 15, 16, 17, 18, 19]; //sports 
+var tileGroup2 =[20, 21, 22, 23, 24, 25, 26, 27, 28, 29]; //stats
+var tileGroup3 =[30, 31, 32, 33, 34, 35, 36, 37, 38, 39]; //stadium
+var tileGroup4 =[40, 41, 42, 43, 44, 45, 46, 47, 48, 49]; //4K
+var tileGroup5 =[50, 51, 52, 53, 54, 55, 56, 57, 58, 59]; //Games
+
+$(document).ready(() => {
+    main();
+    init();
+});
+
+function init() {
+    attachToSocket();
+    mapPageKeyPresses();
+    attachToControls();
+
+	var menuItem0 = $("#menu_item_0").css("fontWeight", "900").css("color", "white");
+	setFocus($("#div_tile_img_id_0"));
+
+	vid_toggle_mute(0); //unmute vid 0  
+	toggle_all(true); //start playing all videos
+
+	for (var idx = 0; idx <= 9; idx++) {
+		var div_tile_obj = $("#div_tile_img_id_" + idx);
+		g_tiles_left_pos[idx] = parseInt(div_tile_obj.css("left"), 10);
+	}
+
+	$('html, body').on('touchstart touchmove', function(e) {
+		//prevent native touch activity like scrolling
+		e.preventDefault();
+	});
+
+	$("#menu_item_0, #menu_item_1, #menu_item_2, #menu_item_3, #menu_item_4, #menu_item_5").bind('touchstart mousedown', function(e) {
+		process_menu_items($(this));
+	});
+
+	$("#vol_0,#vol_1, #vol_2, #vol_3").bind('touchstart mousedown', function(e) {
+		e.stopPropagation();
+		var vol_id = Number(this.id.replace("vol_",""));
+		var vol_msg = {
+			message: vol_id,
+			name: KeyCode.ToggleMute,
+			action: Event.video_events2
+		};
+		vid_toggle_mute(vol_id);
+		send_msg(vol_msg);
+	});
+
+	$("#vid0_tile, #vid1_tile, #vid2_tile, #vid3_tile, #vid_area_tile").bind('touchstart mousedown', function(e) {
+		var ps4_tile_present = false;
+		var msgId = Number(this.id.replace("div_vid_tile_id_",""));
+
+		switch (msgId) {
+			case 0: ps4_tile_present = g_ps4_tile0 == true; break;
+			case 1: ps4_tile_present = g_ps4_tile1 == true; break;
+			case 2: ps4_tile_present = g_ps4_tile2 == true; break;
+			case 3: ps4_tile_present = g_ps4_tile3 == true; break;
+		}
+
+		if (ps4_tile_present == true) {
+			tv_set.tv_4k_1.sendCmd("HDMI2");
+			g_ps4_tv_input = true;
+			console.log("set HDMI2 ");
+		}
+
+		if (g_ps4_tv_input != true) {
+			var msg = {
+				message: msgId,
+				name: KeyCode.StitchVideo,
+				action: Event.stitch_split_8k
+			};
+			send_msg(msg);
+		}
+
+		if (ps4_tile_present == false) {
+			if (g_ps4_tv_input == true) {
+				tv_set.tv_4k_1.sendCmd("HDMI1");
+				g_ps4_tv_input = false;
+				console.log("set HDMI1 ");
+			}
+		}
+
+		vid_toggle_mute(msgId);
+
+		if (g_video_full_screen_mode == false) {
+			$("#vid_area_tile").css("display", "block");
+			g_video_full_screen_mode = true;
+		} else {
+			$("#vid_area_tile").css("display", "none");
+			g_video_full_screen_mode = false;
+		}
+	});
+
+	var timeTouch;
+	var dragStart = false;
+	$(".div_tile").bind({
+		touchstart: function(e) {
+			console.log('touchstart');
+			timeTouch = new Date();
+		},
+
+		touchend: function(e) {
+			console.log('touchend');
+			var time_diff = new Date() - timeTouch;
+			if (time_diff < 200) {
+				if (dragStart == false) { //tile tap detected, set tile video to full screen
+					console.log('tap');
+				} else {
+					console.log('tap, drag start');
+				}
+			} else {
+				console.log('swipe');
+			}
+		}
+	});
+
+	var gVal = 0;
+
+	$(".div_tile").draggable({
+		helper: "clone",
+		revert: "invalid",
+		zIndex: 1000,
+		appendTo: "body",
+		opacity: 0.5,
+		start: function(event, ui) {
+			console.log('draggable start');
+			dragStart = true;
+			// uh this seems weak....  Should just pull the name from the end marker
+			newVid = ((+(this.id.substring(16))) + (+g_tile_group * 10)) + '.mp4';
+			console.log(newVid);
+			g_xpos = ui.position.left;
+			g_ypos = ui.position.top;
+		},
+		stop: function(event, ui) {
+			console.log('draggable end');
+			dragStart = false;
+			var xmove = ui.position.left - g_xpos;
+			var ymove = ui.position.top - g_ypos;
+
+			// define the moved direction: right, bottom (when positive), left, up (when negative)
+			var xd = xmove >= 0 ? ' To right: ' : ' To left: ';
+			var yd = ymove >= 0 ? ' Bottom: ' : ' Up: ';
+
+			console.log('The DIV was moved,\n\n' + xd + xmove + ' pixels \n' + yd + ymove + ' pixels');
+
+			//save last offset
+			if (g_process_tile_move == true) {
+				for (var idx = 0; idx <= 9; idx++) {
+					g_tiles_left_pos[idx] += xmove;
+					console.log("left_pos tile" + idx + ": " + g_tiles_left_pos[idx]);
+				}
+			}
+			gVal = 0;
+		},
+		drag: function(event, ui) {
+			var x_move = ui.position.left - g_xpos;
+			var y_move = ui.position.top - g_ypos;
+
+			gVal++;
+			if (gVal >= 0 && (y_move > (-60))) {
+				process_tile_move(x_move);
+				gVal = 0;
+				g_process_tile_move = true;
+			} else {
+				g_process_tile_move = false;
+			}
+		}
+	});
+
+    attachDroppable("0");
+    attachDroppable("1");
+    attachDroppable("2");
+    attachDroppable("3");
+}
+
+function mapPageKeyPresses() {
+    var pagekeymap;	// Initialized with the list of keypresses that occur across the page 
+    // in general and associates with their handler
+
+    pagekeymap = [
+		{ key: KeyCode.ToggleFullScreen, func: toggleFullScreen },
+		{ key: KeyCode.ReloadPage, func: () => { location.reload(); } },
+		{ key: KeyCode.PlayVideos, func: playVideos },
+		{ key: KeyCode.ChangeToHDMI1, func: test_tv_http_control, arg: "HDMI1" },
+		{ key: KeyCode.ChangeToHDMI2, func: test_tv_http_control, arg: "HDMI2" },
+		{ key: KeyCode.ChangeToHDMI3, func: test_tv_http_control, arg: "HDMI3" },
+		{ key: KeyCode.ChangeToHDMI4, func: test_tv_http_control, arg: "HDMI4" },
+		{ key: KeyCode.MuteAudios, func: muteAudios }
+    ];
+
+    mapKeyPresses($(document), pagekeymap);
+}
 
 function main() {
 	for (var x = 0; x < 10; x++) {
@@ -60,85 +250,56 @@ function add_tile(c) {
 		'		width: 523px;' +
 		'		height: 523px;' +
 		'		background-image: url(image/' + (c.index) + '.jpg);' +
-		'		background-size:"cover";' +
-		'		background-color: none; ' +
 		'		z-index:1000;">' +
 		'</div>'
 	);
 }
-function getSiteRoot()
-{
-    var rootPath = window.location.protocol + "//" + window.location.host + "/";
-	
-	var path = window.location.pathname;
-	
-	// ok, now rip off everything from the last / down
-	var pos = path.lastIndexOf("/");
-	path = path.substring(1, pos);
-	rootPath = rootPath + path + "/";
-
-    return rootPath;
-}
 
 function onMessage(evt) {
+	
 	var msg = JSON.parse(evt.data); //PHP sends Json data
 
 	if(msg === null)
 		return;
 	
-	console.log("tv receive:{0} {1} {2}".format(msg.message, msg.name, msg.color));
+    // If the message is from this client just ignore it
+    if (msg.clientId === getClientId())
+        return;
 
-	switch (msg.color) {
-		case Event.seek_time:
-			var video = findVideo(msg);
-			if(video.paused)
-				return;
-			var newVideo = "{1}videos/stadium_tablet/270/{0}.mp4".format(msg.videoName, getSiteRoot());
-			var src = video.currentSrc;
-			if(src !== newVideo) {
-				console.log("New Video: " + msg.videoName + "  Curr Video: " + src.substring(src.length-10));
-				video.src = newVideo;
-				video.play();				
-			}
-			video.currentTime = msg.videoPosition;
-			break;
-	case Event.BroadcastServerStatus:
-		for(var idx in msg.videos){
-			var item = msg.videos[idx];
-			var video = findVideo(item);
-			if(video && !video.paused) {
-				var newVideo = "{1}videos/stadium_tablet/270/{0}.mp4".format(item.videoName, getSiteRoot());
-				var src = video.currentSrc;
-				if(src !== newVideo) {
-					console.log("New Video: " + item.videoName + "  Curr Video: " + src.substring(src.length-10));
-					video.src = newVideo;
-					video.play();				
+	var strmsg = JSON.stringify(msg);
+	console.log("tv receive:" + strmsg);
+
+	switch (msg.action) {
+		case Event.BroadcastServerStatus:
+			for(var idx in msg.videos){
+				var item = msg.videos[idx];
+				var video = findVideo(item);
+				if(video) { // Did we find a video?
+					
+					// Get the old and new name
+					var	newVideo = "{1}videos/stadium_tablet/270/{0}.mp4".format(item.videoName, getSiteRoot());
+					var src = getVideoSource(video);
+					
+					// if the names are different we need to change the video
+					if(src !== newVideo) {
+						console.log("New Video: " + item.videoName + "  Curr Video: " + src);
+						video.src = newVideo;
+					}
+
+					// If the paused states are different we need to get these in synchronized
+					if(video.paused != item.isPaused)
+						if(item.isPaused)
+							video.pause();
+						else
+							video.play();
+						
+					var ct = video.currentTime;
+					var diff = Math.abs(ct-item.videoPosition);
+					if(diff >= .5)
+						video.currentTime = item.videoPosition;
 				}
-				video.currentTime = item.videoPosition;
 			}
-		}
-		break;
-	}
-}
-
-function toggleFullScreen() {
-	if (!document.fullscreenElement && // alternative standard method
-		!document.mozFullScreenElement && !document.webkitFullscreenElement) { // current working methods
-		if (document.documentElement.requestFullscreen) {
-			document.documentElement.requestFullscreen();
-		} else if (document.documentElement.mozRequestFullScreen) {
-			document.documentElement.mozRequestFullScreen();
-		} else if (document.documentElement.webkitRequestFullscreen) {
-			document.documentElement.webkitRequestFullscreen(Element.ALLOW_KEYBOARD_INPUT);
-		}
-	} else {
-		if (document.cancelFullScreen) {
-			document.cancelFullScreen();
-		} else if (document.mozCancelFullScreen) {
-			document.mozCancelFullScreen();
-		} else if (document.webkitCancelFullScreen) {
-			document.webkitCancelFullScreen();
-		}
+			break;
 	}
 }
 
@@ -156,350 +317,39 @@ function muteAudios(){
 	}
 }
 
-function findMap(map, code) { 
-	return map.key === code;
+function attachToSocket() {
+    console.log("websocket server IP:" + websocket_server_ip);
+    socket = new WebSocket('ws://' + websocket_server_ip + ':9000/');
+    socket.addEventListener("message", onMessage, false);
 }
 
-function init() {
-	pagekeymap = [
-		{key:KeyCode.ToggleFullScreen, 	func:toggleFullScreen},
-		{key:KeyCode.ReloadPage, 		func:() => { location.reload(); }},
-		{key:KeyCode.PlayVideos, 		func:playVideos},
-		{key:KeyCode.ChangeToHDMI1, 	func:test_tv_http_control, arg:"HDMI1"},
-		{key:KeyCode.ChangeToHDMI2, 	func:test_tv_http_control, arg:"HDMI2"},
-		{key:KeyCode.ChangeToHDMI3, 	func:test_tv_http_control, arg:"HDMI3"},
-		{key:KeyCode.ChangeToHDMI4, 	func:test_tv_http_control, arg:"HDMI4"},
-		{key:KeyCode.MuteAudios, 		func:muteAudios}
-	];
+function attachDroppable(id) {
+    var controlName = "#vid" + id + "_tile";
+    var divtileId = "#div_vid_tile_id_" + id;
 
-	var videos = $('video');
-	videos.focus(function(){process_video_items($(this));});
-	videos.mouseover(function(){process_video_items($(this));});
-	videos.keydown(function(){monitor_video_keydown($(this));});
-	
-	socket = new WebSocket('ws://' + websocket_server_ip + ':9000/');
-	console.log("websocket server IP:" + websocket_server_ip);
-
-	socket.addEventListener("message", onMessage, false);
-
-	$(document).keydown((e) => {
-		// Figure out what the keypress was
-		var keyValue = getKeyValue(e);
-		// Find the function mapped to the keypress
-		var map = pagekeymap.find((e,i,a) => findMap(e, keyValue));
-		if(map)
-			// Call the function
-			map.func(map.arg);
-	});
-	
-	menu_HTML = '<ul><li id="menu_item_0" tabindex="0" onmouseover="process_menu_items(' + 0 + ')" onfocus="process_menu_items(' + 0 + ')" onkeydown="monitor_menu_keydown(' + 0 + ')" >Watch Now</li>' +
-		'<li id="menu_item_1" tabindex="0" onmouseover="process_menu_items(' + 1 + ')" onfocus="process_menu_items(' + 1 + ')" onkeydown="monitor_menu_keydown(' + 1 + ')" >Sports</li>' +
-		'<li id="menu_item_2" tabindex="0" onmouseover="process_menu_items(' + 2 + ')" onfocus="process_menu_items(' + 2 + ')" onkeydown="monitor_menu_keydown(' + 2 + ')" >Stats</li>' +
-		'<li id="menu_item_3" tabindex="0" onmouseover="process_menu_items(' + 3 + ')" onfocus="process_menu_items(' + 3 + ')" onkeydown="monitor_menu_keydown(' + 3 + ')" >Stadium</li>' +
-		'<li id="menu_item_4" tabindex="0" onmouseover="process_menu_items(' + 4 + ')" onfocus="process_menu_items(' + 4 + ')" onkeydown="monitor_menu_keydown(' + 4 + ')" >4K</li>' +
-		'<li id="menu_item_5" tabindex="0" onmouseover="process_menu_items(' + 5 + ')" onfocus="process_menu_items(' + 5 + ')" onkeydown="monitor_menu_keydown(' + 5 + ')" >Games</li> </ul>'
-	document.getElementById("menu_items").innerHTML = menu_HTML;
-
-	var menu_item_0 = document.getElementById("menu_item_0");
-	menu_item_0.style.fontWeight = "900";
-	menu_item_0.style.color = "white";
-
-	var img_tile_0 = document.getElementById("div_tile_img_id_0");
-	img_tile_0.focus();
-
-	vid_toggle_mute(0); //unmute vid 0  
-	toggle_all(true); //start playing all videos
-
-	var new_vid = null;
-	var msg_id;
-
-	for (var idx = 0; idx <= 9; idx++) {
-		var tile_name = "div_tile_img_id_" + idx;
-		var div_tile_obj = document.getElementById(tile_name);
-		g_tiles_left_pos[idx] = parseInt(div_tile_obj.style.left, 10);
-		console.log("left_pos tile" + idx + ": " + g_tiles_left_pos[idx]);
-	}
-
-	$('html, body').on('touchstart touchmove', function(e) {
-		//prevent native touch activity like scrolling
-		e.preventDefault();
-	});
-
-	$("#menu_item_0, #menu_item_1, #menu_item_2, #menu_item_3, #menu_item_4, #menu_item_5").bind('touchstart mousedown', function(e) {
-		var menu_id;
-		switch (e.target.id) {
-			case "menu_item_0": menu_id = 0; break;
-			case "menu_item_1": menu_id = 1; break;
-			case "menu_item_2": menu_id = 2; break;
-			case "menu_item_3": menu_id = 3; break;
-			case "menu_item_4": menu_id = 4; break;
-			case "menu_item_5": menu_id = 5; break;
-		}
-		process_menu_items(menu_id);
-	});
-
-	$("#vol_0,#vol_1, #vol_2, #vol_3").bind('touchstart mousedown', function(e) {
-		e.stopPropagation();
-		console.log('vol ' + e.target.id);
-		var vol_id = -1;
-		switch (e.target.id) {
-			case "vol_0": vol_id = 0; break;
-			case "vol_1": vol_id = 1; break;
-			case "vol_2": vol_id = 2; break;
-			case "vol_3": vol_id = 3; break;
-		}
-		var vol_msg = {
-			message: vol_id,
-			name: 77, //'m'
-			color: Event.video_events2
-		};
-		vid_toggle_mute(vol_id);
-		send_msg(vol_msg);
-	});
-
-	$("#vid0_tile, #vid1_tile, #vid2_tile, #vid3_tile, #vid_area_tile").bind('touchstart mousedown', function(e) {
-		console.log('vid ' + e.type);
-		var ps4_tile_present = false;
-
-		switch (e.target.id) {
-			case "div_vid_tile_id_0":
-				msg_id = 0;
-				ps4_tile_present = g_ps4_tile0 == true;
-				break;
-			case "div_vid_tile_id_1":
-				msg_id = 1;
-				ps4_tile_present = g_ps4_tile1 == true;
-				break;
-			case "div_vid_tile_id_2":
-				msg_id = 2;
-				ps4_tile_present = g_ps4_tile2 == true;
-				break;
-			case "div_vid_tile_id_3":
-				msg_id = 3;
-				ps4_tile_present = g_ps4_tile3 == true;
-				break;
-			default:
-				break;
-		}
-
-		if (ps4_tile_present == true) {
-			tv_set.tv_4k_1.sendCmd("HDMI2");
-			g_ps4_tv_input = true;
-			console.log("set HDMI2 ");
-		}
-
-		if (g_ps4_tv_input != true) {
-			var msg = {
-				message: msg_id,
-				name: 87, //'w'
-				color: Event.stitch_split_8k
-			};
-			send_msg(msg);
-		}
-
-		if (ps4_tile_present == false) {
-			if (g_ps4_tv_input == true) {
-				tv_set.tv_4k_1.sendCmd("HDMI1");
-				g_ps4_tv_input = false;
-				console.log("set HDMI1 ");
-			}
-		}
-
-		vid_toggle_mute(msg_id);
-
-		if (g_video_full_screen_mode == false) {
-			$("#vid_area_tile").css("display", "block");
-			g_video_full_screen_mode = true;
-		} else {
-			$("#vid_area_tile").css("display", "none");
-			g_video_full_screen_mode = false;
-		}
-	});
-
-	var time_touch;
-	var drag_start = false;
-	$(".div_tile").bind({
-		touchstart: function(e) {
-			console.log('touchstart');
-			time_touch = new Date();
-		},
-
-		touchend: function(e) {
-			console.log('touchend');
-			var time_diff = new Date() - time_touch;
-			if (time_diff < 200) {
-				if (drag_start == false) { //tile tap detected, set tile video to full screen
-					console.log('tap');
-					var tile_vid = 'videos/' + ((+(this.id.substring(16))) + (+20)) + '.mp4';
-					var msg = {
-						message: 87, //'w' - full screen code
-						name: new_vid, //new video source
-						color: Event.stitch_split_8k
-					};
-				} else {
-					console.log('tap, drag start');
-				}
-			} else {
-				console.log('swipe');
-			}
-		}
-	});
-
-	var g_val = 0;
-
-	$(".div_tile").draggable({
-		helper: "clone",
-		revert: "invalid",
-		zIndex: 1000,
-		appendTo: "body",
-		opacity: 0.5,
-		start: function(event, ui) {
-			console.log('draggable start');
-			drag_start = true;
-			// uh this seems weak....  Should just pull the name from the end marker
-			new_vid = ((+(this.id.substring(16))) + (+g_tile_group * 10)) + '.mp4';
-			console.log(new_vid);
-			g_xpos = ui.position.left;
-			g_ypos = ui.position.top;
-		},
-		stop: function(event, ui) {
-			console.log('draggable end');
-			drag_start = false;
-			var xmove = ui.position.left - g_xpos;
-			var ymove = ui.position.top - g_ypos;
-
-			// define the moved direction: right, bottom (when positive), left, up (when negative)
-			var xd = xmove >= 0 ? ' To right: ' : ' To left: ';
-			var yd = ymove >= 0 ? ' Bottom: ' : ' Up: ';
-
-			console.log('The DIV was moved,\n\n' + xd + xmove + ' pixels \n' + yd + ymove + ' pixels');
-
-			//save last offset
-			if (g_process_tile_move == true) {
-				for (var idx = 0; idx <= 9; idx++) {
-					g_tiles_left_pos[idx] += xmove;
-					console.log("left_pos tile" + idx + ": " + g_tiles_left_pos[idx]);
-				}
-			}
-			g_val = 0;
-		},
-		drag: function(event, ui) {
-			var x_move = ui.position.left - g_xpos;
-			var y_move = ui.position.top - g_ypos;
-
-			g_val++;
-			if (g_val >= 0 && (y_move > (-60))) {
-				process_tile_move(x_move);
-				g_val = 0;
-				g_process_tile_move = true;
-			} else {
-				g_process_tile_move = false;
-			}
-		}
-	});
-
-	$("#vid0_tile").droppable({
-		drop: function(event, ui) {
-			var tile_id = (+(ui.draggable.attr("id").substring(16))) + (+g_tile_group * 10);
+	$(controlName).droppable({
+	    drop: function(event, ui) {
+			var tileId = (+(ui.draggable.attr("id").substring(16))) +(+g_tile_group * 10);
 			g_ps4_tile0 = false;
-			if (tile_id == 53) {
+
+            if (tileId == 53) {
 				g_ps4_tile0 = true;
 				console.log("vid0_tile: ps4 tile present");
 			}
+
 			$(this).css("opacity", "1");
-			$("#div_vid_tile_id_0").attr("src", "videos/stadium_tablet/270/" + new_vid);
-			$("#div_vid_tile_id_0").get(0).play();
+			$(divtileId).attr("src", "videos/stadium_tablet/270/" +newVid);
+			$(divtileId).get(0).play();
+
 			var msg = {
-				message: 0, //vid_tile
-				name: new_vid, //new video source
-				color: Event.dragdrop2
+	            message: id, //vid_tile
+			    name : newVid, //new video source
+			    action : Event.dragdrop2
 			};
-			send_msg(msg);
+            send_msg(msg);
 			vid_toggle_mute(0);
 		},
-		over: function(event, ui) {
-			$(this).css("opacity", "0.6");
-		},
-		out: function(event, ui) {
-			$(this).css("opacity", "1");
-		}
-	});
-
-	$("#vid1_tile").droppable({
-		drop: function(event, ui) {
-			var tile_id = (+(ui.draggable.attr("id").substring(16))) + (+g_tile_group * 10);
-			g_ps4_tile1 = false;
-			if (tile_id == 53) {
-				g_ps4_tile1 = true;
-				console.log("vid1_tile: ps4 tile present");
-			}
-			$(this).css("opacity", "1");
-			$("#div_vid_tile_id_1").attr("src", "videos/stadium_tablet/270/" + new_vid);
-			$("#div_vid_tile_id_1").get(0).play();
-			var msg = {
-				message: 1, //vid_tile
-				name: new_vid, //new video source
-				color: Event.dragdrop2
-			};
-			send_msg(msg);
-			vid_toggle_mute(1);
-		},
-		over: function(event, ui) {
-			$(this).css("opacity", "0.6");
-		},
-		out: function(event, ui) {
-			$(this).css("opacity", "1");
-		}
-	});
-
-	$("#vid2_tile").droppable({
-		drop: function(event, ui) {
-			var tile_id = (+(ui.draggable.attr("id").substring(16))) + (+g_tile_group * 10);
-			g_ps4_tile2 = false;
-			if (tile_id == 53) {
-				g_ps4_tile2 = true;
-				console.log("vid2_tile: ps4 tile present");
-			}
-
-			$(this).css("opacity", "1");
-			$("#div_vid_tile_id_2").attr("src", "videos/stadium_tablet/270/" + new_vid);
-			$("#div_vid_tile_id_2").get(0).play();
-			var msg = {
-				message: 2, //vid_tile
-				name: new_vid, //new video source
-				color: Event.dragdrop2
-			};
-			send_msg(msg);
-			vid_toggle_mute(2);
-		},
-		over: function(event, ui) {
-			$(this).css("opacity", "0.6");
-		},
-		out: function(event, ui) {
-			$(this).css("opacity", "1");
-		}
-	});
-
-	$("#vid3_tile").droppable({
-		drop: function(event, ui) {
-			var tile_id = (+(ui.draggable.attr("id").substring(16))) + (+g_tile_group * 10);
-			g_ps4_tile3 = false;
-			if (tile_id == 53) {
-				g_ps4_tile3 = true;
-				console.log("vid3_tile: ps4 tile present");
-			}
-			$(this).css("opacity", "1");
-			$("#div_vid_tile_id_3").attr("src", "videos/stadium_tablet/270/" + new_vid);
-			$("#div_vid_tile_id_3").get(0).play();
-			var msg = {
-				message: 3, //vid_tile
-				name: new_vid, //new video source
-				color: Event.dragdrop2
-			};
-			send_msg(msg);
-			vid_toggle_mute(3);
-		},
-		over: function(event, ui) {
+		over : function(event, ui) {
 			$(this).css("opacity", "0.6");
 		},
 		out: function(event, ui) {
@@ -520,15 +370,6 @@ function process_tile_move(x_move) {
 		var div_tile_obj = document.getElementById(tile_name);
 		pos_left = g_tiles_left_pos[idx] + x_move;
 		div_tile_obj.style.left = pos_left + 'px';
-	}
-}
-
-function send_msg(msg) {
-	console.log("send1:" + msg.message + " " + msg.name + " " + msg.color);
-	try {
-		socket.send(JSON.stringify(msg));
-	} catch (err) {
-		console.log("error sending websocket message:" + err.message);
 	}
 }
 
@@ -565,17 +406,30 @@ function toggle_all(e) {
 }
 
 function show_description(x) {
-	var image;
-	var tile_name;
-
-	tile_name = "div_tile_img_id_" + x;
-
-	var img_tile = document.getElementById(tile_name);
-	img_tile.focus();
+    var tileName = "#div_tile_img_id_" + x;
+	var control = $(tileName);
+	setFocus(control);
 }
 
 function process_video_items(control) {
-	control.focus();
+	setFocus(control);
+}
+
+// I need to determine if the USER caused this so we can ignore it otherwise
+function changedPosition(v){
+	var video = v[0];
+	var videoTile = video.id.replace(VIDEO_BASE_TAG, "");
+	var srcitems = video.src.split("/");
+	
+	var msg = {
+		videoTile: videoTile,
+		videoPosition: video.currentTime,
+		videoName: srcitems[srcitems.length-1].replace(".mp4",""),
+		isPaused: video.paused,
+		action: Event.VideoPositionChange
+	};
+	
+	send_msg(msg);
 }
 
 function monitor_video_keydown(control) {
@@ -583,44 +437,42 @@ function monitor_video_keydown(control) {
 
 	var next_video = x;
 
-	remove_detail_pop_up();
-
 	var msg = {
 		message: x,
 		name: window.event.keyCode,
-		color: Event.video_events2
+		action: Event.video_events2
 	};
 	send_msg(msg);
 
-	switch (getKeyValue(window.event.keyCode)) {
+	switch (getKeyValue()) {
 		case KeyCode.ToggleAllPause:  	toggle_all(true); break;
 		case KeyCode.ToggleMute: 		vid_toggle_mute(x); break;
 		case KeyCode.TogglePause: 		play_pause(x); break;
-		case KeyCode.SwitchVideo: // 83: // 's'
+		case KeyCode.SwitchVideo: 
 			if (x > 0) {
 				switch_video(x);
 			}
 			break;
-		case KeyCode.Left: // 37: //'left'
+		case KeyCode.Left: 
 			next_video = ((x == 1) || (x == 3)) ? x - 1 : x;
 			break;
-		case KeyCode.Up: // 38: //'up'
+		case KeyCode.Up: 
 			next_video = ((x < 2)) ? x : x - 2;
 			break;
-		case KeyCode.Right: // 39: //'right'
+		case KeyCode.Right: 
 			next_video = ((x == 0) || (x == 2)) ? x + 1 : x;
 			break;
-		case KeyCode.Down: // 40: //'down'
+		case KeyCode.Down: 
 			next_video = ((x == 0) || (x == 1)) ? x + 2 : 100; //go to menu items
 			break;
 	}
 	if (next_video != 100) {
-		var img_tile = findVideo(next_video);
-		img_tile.focus();
+		var control = findVideo(next_video);
+		setFocus(control);
 	} else {
 		var item_id = "menu_item_" + g_menu_item;
-		var menu_item = document.getElementById(item_id);
-		menu_item.focus();
+		var control = document.getElementById(item_id);
+		setFocus(control);
 	}
 	
 	g_video_item = x;
@@ -661,215 +513,136 @@ function play_pause(x) {
 	}
 }
 
-function monitor_menu_keydown(x) {
+function monitor_menu_keydown(control) {
+	var x = Number(control.attr("data-panelNumber"));
 	var next_item = x;
-	remove_detail_pop_up();
 
-	var found = false;
-	switch (getKeyCode(window.event.keyCode)) {
-		case 13: // 'Enter'
-			found = true;
+	switch (getKeyValue()) {
+		case KeyCode.Left:
+			next_item = (x > 0) ? x - 1 : x;
 			break;
-	}
-	
-	if(!found){
-		switch (getKeyValue(window.event.keyCode)) {
-			case KeyCode.Left: //'left'
-				next_item = (x > 0) ? x - 1 : x;
-				break;
-			case KeyCode.Up: //'up'
-				next_item = 200;
-				break;
-			case KeyCode.Right: //'right'
-				next_item = (x < 4) ? x + 1 : x;
-				break;
-			case KeyCode.Down: //'down'
-				next_item = 100; //move down to image tiles
-				break;
-		}
+		case KeyCode.Up: 
+			next_item = 200;
+			break;
+		case KeyCode.Right: 
+			next_item = (x < 5) ? x + 1 : x;
+			break;
+		case KeyCode.Down: 
+			next_item = 100; //move down to image tiles
+			break;
 	}
 
 	if (next_item == 100) { //move down to image tiles
 		var tile_name = "div_tile_img_id_0";
-		var img_tile = document.getElementById(tile_name);
-		img_tile.focus();
+		var control = document.getElementById(tile_name);
+		setFocus(control);
 	} else if (next_item == 200) { //move up to video tiles
-		var video_tile = findVideo(g_video_item);
-		video_tile.focus();
+		var control = findVideo(g_video_item);
+		setFocus(control);
 	} else {
 		var item_id = "menu_item_" + next_item;
 		var menu_item = document.getElementById(item_id);
-		menu_item.focus();
+		process_menu_items($(menu_item));
 	}
 
 	g_menu_item = x;
 }
 
-function process_menu_items(x) {
-	var item_id = "menu_item_" + x;
-	var menu_element = document.getElementById(item_id);
-	menu_element.focus();
-
-	change_menu_item_highlight(x);
-	update_tiles(x);
+function process_menu_items(control) {
+	setFocus(control);
+	
+	var menu_item = Number(control.attr("data-panelNumber"));
+	change_menu_item_highlight(menu_item);
+	update_tiles(menu_item);
 }
 
-function update_tiles(menu_item) {
-	var tile_group;
+function update_tiles(menuItem) {
+	
+	var tileGroup = null;
 
-	var tile_group_0 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]; //watch now
-	var tile_group_1 = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19]; //sports 
-	var tile_group_2 = [20, 21, 22, 23, 24, 25, 26, 27, 28, 29]; //stats
-	var tile_group_3 = [30, 31, 32, 33, 34, 35, 36, 37, 38, 39]; //stadium
-	var tile_group_4 = [40, 41, 42, 43, 44, 45, 46, 47, 48, 49]; //4K
-	var tile_group_5 = [50, 51, 52, 53, 54, 55, 56, 57, 58, 59]; //Games
-
-	switch (menu_item) {
+	switch (menuItem) {
 		case 0:
-			tile_group = tile_group_0; //watch now
+			tileGroup = tileGroup0; //watch now
 			g_tile_group = 0;
 			break;
 		case 1:
-			tile_group = tile_group_1; //sports
+			tileGroup = tileGroup1; //sports
 			g_tile_group = 1;
 			break;
 		case 2:
-			tile_group = tile_group_2; //stats
+			tileGroup = tileGroup2; //stats
 			g_tile_group = 2;
 			break;
 		case 3:
-			tile_group = tile_group_3; //stadium
+			tileGroup = tileGroup3; //stadium
 			g_tile_group = 3;
 			break;
 		case 4:
-			tile_group = tile_group_4; //4K
+			tileGroup = tileGroup4; //4K
 			g_tile_group = 4;
 			break;
 		case 5:
-			tile_group = tile_group_5; //Games
+			tileGroup = tileGroup5; //Games
 			g_tile_group = 5;
-			break;
-		default:
-			return;
 			break;
 	}
 
-	for (var idx = 0; idx < tile_group.length; idx++) {
-		var r = tile_group[idx];
-		var tile_name = "div_tile_img_id_" + idx;
-		var img_tile = document.getElementById(tile_name);
-		var img_name = "./image/" + r + ".jpg";
-		img_tile.style.backgroundImage = "url(" + img_name + ")";
+    if (!tileGroup)
+        return ;
+
+    // All this is doing is changing aroung the URLS for the current videos in the little tiles
+	for (var idx = 0; idx < tileGroup.length; idx++) {
+		var r = tileGroup[idx];
+		var tileName = "div_tile_img_id_" + idx;
+		var imgTile = document.getElementById(tileName);
+		var imgName = "./image/" + r + ".jpg";
+		imgTile.style.backgroundImage = "url(" + imgName + ")";
 	}
 }
 
 function change_menu_item_highlight(x) {
-	for (var idx = 0; idx < 6; idx++) {
-		var menu_item = document.getElementById("menu_item_" + idx);
-		menu_item.style.fontWeight = "600";
-		menu_item.style.color = "#B7B7B7";
-	}
+	$('.menuitem').css("font-weight", "600").css("color", "#B7B7B7");
+	$("#menu_item_" + x).css("font-weight", "900").css("color", "white");
+}
 
-	var menu_item_new = document.getElementById("menu_item_" + x);
-	menu_item_new.style.fontWeight = "900";
-	menu_item_new.style.color = "white";
+function getMenuElementId(msg) {
+	var value =  MENU_BASE_TAG+getId(msg);
+	return value;
+}
+
+function findMenu(msg){
+	if(isJqueryItem(msg))
+		return msg;
+	var search = "#" + getMenuElementId(msg);
+	var value = $(search);
+	return (value.length) ? $(value[0]): null;
 }
 
 function monitor_tile_key_down(x) {
-	var next_tile = x;
+	var nextTile = x;
 
-	remove_detail_pop_up();
-
-	switch (getKeyCode(window.event.keyCode)) {
-		case KeyCode.GetInformation: // 'i'
-			show_detail_pop_up(x);
-			break;
-		case KeyCode.ShowFullScreenVideo: // 's'
-			show_full_screen_video(x, g_video_full_screen_mode);
-			break;
+	switch (getKeyValue()) {
 		case KeyCode.Left:
-			next_tile = (x > 0) ? x - 1 : x;
+			nextTile = (x > 0) ? x - 1 : x;
 			break;
 		case KeyCode.Up:
-			next_tile = 100; //go to menu items
+			nextTile = 100; //go to menu items
 			break;
 		case KeyCode.Right:
-			next_tile = (x < 9) ? x + 1 : x;
+			nextTile = (x < 9) ? x + 1: x;
+		    break;
 		case KeyCode.Down:
-			next_tile = x;
+			nextTile = x;
 			break;
 	}
-	if (next_tile != 100) {
-		var tile_name = "div_tile_img_id_" + next_tile;
-		var img_tile = document.getElementById(tile_name);
-		img_tile.focus();
+
+	if (nextTile !== 100) {
+		var control = $("#div_tile_img_id_" + nextTile);
+		setFocus(control);
 	} else {
-		var item_id = "menu_item_" + g_menu_item;
-		var menu_item = document.getElementById(item_id);
-		menu_item.focus();
+		var control = $("#menu_item_" + g_menu_item);
+		setFocus(control);
 	}
 	
 	g_tile_item = x;
 }
-
-function remove_detail_pop_up() {
-	var temp = document.getElementById('preview_div');
-	temp.style.display = 'none';
-}
-
-function show_detail_pop_up(x) {
-	var image_name;
-	switch (x) {
-		case 0: image_name = 'details_0.jpg'; break;
-		case 1: image_name = 'details_1.jpg'; break;
-		case 2: image_name = 'details_2.jpg'; break;
-		case 9: image_name = 'details_9.jpg'; break;
-	}
-
-	detail_HTML = '<div class="preview_temp_load"><img id="details_img" src="./image/' + image_name + '" border="0"></div>';
-	document.getElementById("preview_div").innerHTML = detail_HTML;
-	document.getElementById("preview_div").style.display = "block";
-}
-
-function show_full_screen_video(x, fs_mode) {
-	var new_video;
-	switch (x) {
-		case 0: new_video = "wildalaska"; break;
-		case 1: new_video = "dexter"; break;
-		case 9: new_video = "walkingdead"; break;
-	}
-
-	fs_video_HTML = '<video id="full_video" loop >' +
-		'<source id="vid_src" src="videos/' + new_video + '.mp4"></video>';
-
-	var fsv = document.getElementById("full_screen_video");
-	fsv.innerHTML = fs_video_HTML;
-
-	var fs = document.getElementById("full_video");
-
-	if (fs_mode == false) {
-		console.log('fs: true');
-		fs.play();
-		fs.webkitRequestFullScreen(Element.ALLOW_KEYBOARD_INPUT);
-		fs.style.display = 'inline';
-		fs.style.visibility = 'visible';
-		g_video_full_screen_mode = true;
-	} else {
-		console.log('fs: false');
-		fs.pause();
-		document.webkitCancelFullScreen();
-		fs.style.display = 'none';
-		fs.style.visibility = 'hidden';
-		g_video_full_screen_mode = false;
-		fsv.innerHTML = '';
-		fs.innerHTML = '';
-	}
-}
-
-$(document).ready(() => {
-	Event = CommonEvent;
-	KeyCode = CommonKeyCode;
-
-    main();
-    init();
-});
