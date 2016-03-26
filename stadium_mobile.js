@@ -363,28 +363,6 @@ function toggle_full_screen_video(x, fs_mode) {
     }
 }
 
-function switch_video(x) {
-    var vid_name = "div_vid_tile_id_" + x;
-    var vid_name_src = "div_vid_tile_src_id_" + x;
-    var video = document.getElementById(vid_name);
-    var video_0 = document.getElementById('div_vid_tile_id_0');
-    var video_src = document.getElementById(vid_name_src);
-    var video_0_src = document.getElementById('div_vid_tile_src_id_0');
-
-    video.pause();
-    video_0.pause();
-    var video_src_tmp = video_src.src;
-    var video_0_src_tmp = video_0_src.src;
-
-    video_src.src = video_0_src_tmp;
-    video_0_src.src = video_src_tmp;
-
-    video_0.load();
-    video.load();
-    video_0.play();
-    video.play();
-}
-
 function play_pause(x) {
     var vid_name = "div_vid_tile_id_" + x;
     var video = document.getElementById(vid_name);

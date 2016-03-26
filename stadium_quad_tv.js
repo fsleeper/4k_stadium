@@ -19,14 +19,11 @@ function init() {
     vid_toggle_mute(0); //unmute vid 0  
     toggle_all(true); //start playing all videos
 
-    window.setInterval(send_AllVideoStatus, 1000);
+    window.setInterval(send_AllVideoStatus, REFRESH_CLIENT_INTERVAL);
 }
 
 function mapPageKeyPresses() {
-    var pagekeymap;	// Initialized with the list of keypresses that occur across the page 
-    // in general and associates with their handler
-
-	pagekeymap = [
+    var pagekeymap = [
 		{key:KeyCode.ToggleFullScreen, 	func:toggleFullScreen},
 		{key:KeyCode.ReloadPage, 		func:() => { location.reload(); }},
 		{key:KeyCode.PlayVideos, 		func:playVideos},
@@ -66,11 +63,11 @@ function send_AllVideoStatus() {
     for (var idx = 0; idx < tiles.length; idx++) {
         var video = tiles[idx];
         var videoTile = video.id.replace(VIDEO_BASE_TAG, "");
-		var srcitems = video.src.split("/");
+		var srcitems = getVideoSource(video).split("/");
 		
         var videoInfo = {
             videoTile: videoTile,
-            videoPosition: video.currentTime,
+            videoPosition: currentPosition(video),
 			videoName: srcitems[srcitems.length-1].replace(".mp4",""),
 			isPaused: video.paused
         };
@@ -138,7 +135,7 @@ function changePosition(msg){
 	if(video) { // Did we find a video?
 		
 		// Get the old and new name
-		var newVideo = "{1}videos/stadium_tablet/270/{0}.mp4".format(msg.videoName, getSiteRoot());
+		var newVideo = "videos/stadium_tablet/270/{0}.mp4".format(msg.videoName);
 		var src = video.currentSrc;
 		
 		// if the names are different we need to change the video
@@ -154,7 +151,7 @@ function changePosition(msg){
 			else
 				video.play();
 			
-		var ct = video.currentTime;
+		var ct = currentPosition(video);
 		var diff = Math.abs(ct-msg.videoPosition);
 		if(diff >= .5)
 			video.currentTime = msg.videoPosition;
@@ -198,7 +195,6 @@ function process_video_items(x) {
 
 function monitor_video_message(x, key) {
     var next_video = x;
-
     g_video_item = x;
 
     switch (getKeyValue(key)) {
@@ -223,24 +219,7 @@ function monitor_video_message(x, key) {
                 switch_video(x);
             }
             break;
-        case KeyCode.Left:
-            next_video = ((x == 1) || (x == 3)) ? x - 1 : x;
-            break;
-        case KeyCode.Up:
-            next_video = ((x < 2)) ? x : x - 2;
-            break;
-        case KeyCode.Right:
-            next_video = ((x == 0) || (x == 2)) ? x + 1 : x;
-            break;
-        case KeyCode.Down:
-            next_video = ((x == 0) || (x == 1)) ? x + 2 : x;
-            break;
-    }
-
-    if (next_video != 100) {
-        var control = findVideo(next_video);
-		setFocus($(control));
-    }
+	}
 }
 
 function monitor_video_keydown(x) {
@@ -270,24 +249,7 @@ function monitor_video_keydown(x) {
                 switch_video(x);
             }
             break;
-        case KeyCode.Left:
-            next_video = ((x == 1) || (x == 3)) ? x - 1 : x;
-            break;
-        case KeyCode.Up:
-            next_video = ((x < 2)) ? x : x - 2;
-            break;
-        case KeyCode.Right:
-            next_video = ((x == 0) || (x == 2)) ? x + 1 : x;
-            break;
-        case KeyCode.Down:
-            next_video = ((x == 0) || (x == 1)) ? x + 2 : x;
-            break;
-    }
-
-    if (next_video != 100) {
-        var control = findVideo(next_video);
-		setFocus($(control));
-    }
+	}
 }
 
 function full_screen() {
@@ -326,49 +288,5 @@ function toggle_full_screen_video(x, fs_mode) {
     }
 }
 
-function change_source_full_screen(x) {
-    var video = findVideo("7");
-    var str_trim = (x == 4) ? 21 : 22;
 
-    var video_tile = findVideo(x);
-    var video_src = getVideoSource(video_tile);
-    console.log("video full screen src orig:" + video_src);
-    console.log("video src_full_screen:" + video_src.substring(str_trim));
-
-    var vid_src = video_src; //video_src.substring(str_trim);
-    video.src = vid_src; //"videos/stadium_tv/4K/" + vid_src;
-    console.log("full screen video source: " + video.src);
-}
-
-function switch_video(x) {
-    var vid_name_src = "div_vid_tile_src_id_" + x;
-
-    var video = findVideo(x);
-    var video_0 = findVideo("0");
-
-    video.pause();
-    video_0.pause();
-    var video_src_tmp = video.getAttribute("src"); //video.src;
-    var video_0_src_tmp = video_0.getAttribute("src"); //.src;
-
-    video.src = video_0_src_tmp;
-    video_0.src = video_src_tmp;
-
-    video_0.load();
-    video.load();
-    video_0.play();
-    video.play();
-}
-
-function play_pause(x) {
-    var video = findVideo(x);
-
-    if (video.paused) {
-        console.log('play');
-        video.play();
-    } else {
-        console.log('pause');
-        video.pause();
-    }
-}
 

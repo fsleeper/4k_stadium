@@ -28,12 +28,14 @@ var newVid = null;
 var tv_set = {};
 tv_set.tv_4k_1 = SonyTV('http://192.168.1.28/sony/IRCC');
 
-var tileGroup0 =[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]; 		  //watch now
-var tileGroup1 =[10, 11, 12, 13, 14, 15, 16, 17, 18, 19]; //sports 
-var tileGroup2 =[20, 21, 22, 23, 24, 25, 26, 27, 28, 29]; //stats
-var tileGroup3 =[30, 31, 32, 33, 34, 35, 36, 37, 38, 39]; //stadium
-var tileGroup4 =[40, 41, 42, 43, 44, 45, 46, 47, 48, 49]; //4K
-var tileGroup5 =[50, 51, 52, 53, 54, 55, 56, 57, 58, 59]; //Games
+var tileGroups = [
+	[0,   1,  2,  3,  4,  5,  6,  7,  8,  9], //watch now
+	[10, 11, 12, 13, 14, 15, 16, 17, 18, 19], //sports 
+	[20, 21, 22, 23, 24, 25, 26, 27, 28, 29], //stats
+	[30, 31, 32, 33, 34, 35, 36, 37, 38, 39], //stadium
+	[40, 41, 42, 43, 44, 45, 46, 47, 48, 49], //4K
+	[50, 51, 52, 53, 54, 55, 56, 57, 58, 59] //Games
+]
 
 $(document).ready(() => {
     main();
@@ -67,13 +69,13 @@ function init() {
 
 	$("#vol_0,#vol_1, #vol_2, #vol_3").bind('touchstart mousedown', function(e) {
 		e.stopPropagation();
-		var vol_id = Number(this.id.replace("vol_",""));
+		var id = Number(this.id.replace("vol_",""));
 		var vol_msg = {
-			message: vol_id,
+			message: id,
 			name: KeyCode.ToggleMute,
 			action: Event.video_events2
 		};
-		vid_toggle_mute(vol_id);
+		vid_toggle_mute(id);
 		send_msg(vol_msg);
 	});
 
@@ -205,10 +207,7 @@ function init() {
 }
 
 function mapPageKeyPresses() {
-    var pagekeymap;	// Initialized with the list of keypresses that occur across the page 
-    // in general and associates with their handler
-
-    pagekeymap = [
+    var pagekeymap = [
 		{ key: KeyCode.ToggleFullScreen, func: toggleFullScreen },
 		{ key: KeyCode.ReloadPage, func: () => { location.reload(); } },
 		{ key: KeyCode.PlayVideos, func: playVideos },
@@ -276,9 +275,21 @@ function onMessage(evt) {
 				var video = findVideo(item);
 				if(video) { // Did we find a video?
 					
-					// Get the old and new name
-					var	newVideo = "{1}videos/stadium_tablet/270/{0}.mp4".format(item.videoName, getSiteRoot());
+					// Get the location where the old file is pointed to
 					var src = getVideoSource(video);
+
+					// Now just rip out the name
+					var names = src.split("/");
+					var name = names[names.length-1];
+					name = name.replace(".mp4","");
+					
+					// Build the new name
+					var newVideo = src.replace(name, item.videoName);
+					/*
+					// Get the old and new name
+					var	newVideo = "videos/stadium_tablet/270/{0}.mp4".format(item.videoName);
+					var src = getVideoSource(video);
+					*/
 					
 					// if the names are different we need to change the video
 					if(src !== newVideo) {
@@ -293,7 +304,7 @@ function onMessage(evt) {
 						else
 							video.play();
 						
-					var ct = video.currentTime;
+					var ct = currentPosition(video);
 					var diff = Math.abs(ct-item.videoPosition);
 					if(diff >= .5)
 						video.currentTime = item.videoPosition;
@@ -364,30 +375,27 @@ function test_tv_http_control(cmd) {
 }
 
 function process_tile_move(x_move) {
-	var pos_left;
 	for (var idx = 0; idx <= 9; idx++) {
-		var tile_name = "div_tile_img_id_" + idx;
-		var div_tile_obj = document.getElementById(tile_name);
-		pos_left = g_tiles_left_pos[idx] + x_move;
-		div_tile_obj.style.left = pos_left + 'px';
+		var div_tile_obj = $("#div_tile_img_id_" + idx);
+		var pos_left = g_tiles_left_pos[idx] + x_move;
+		div_tile_obj.css("left", pos_left + 'px');
 	}
 }
 
 function vid_toggle_mute(x) {
 	for (var idx = 0; idx < 4; idx++) {
-		var vol_graphic_name = "vol_" + idx;
 		var vid = findVideo(idx);
-		var vol_graphic = document.getElementById(vol_graphic_name);
+		var vol_graphic = $("#vol_" + idx);
+		
 		if (idx == x) {
-
 			if (vid.muted == true) { //one video has to stay unmuted option
 				vid.muted = false; //unmute video
-				vol_graphic.style.backgroundImage = "url(image/speaker_icon_on.png)";
+				vol_graphic.css("backgroundImage", "url(image/speaker_icon_on.png)");
 			}
 		} else {
 			if (vid.muted == false) {
 				vid.muted = true; //mute video 
-				vol_graphic.style.backgroundImage = "url(image/speaker_icon_off.png)";
+				vol_graphic.css("backgroundImage", "url(image/speaker_icon_off.png)");
 			}
 		}
 	}
@@ -406,24 +414,23 @@ function toggle_all(e) {
 }
 
 function show_description(x) {
-    var tileName = "#div_tile_img_id_" + x;
-	var control = $(tileName);
-	setFocus(control);
+    var controlId = "#div_tile_img_id_" + x;
+	setFocus($(controlId));
 }
 
 function process_video_items(control) {
 	setFocus(control);
 }
 
-// I need to determine if the USER caused this so we can ignore it otherwise
+// I need to determine if the USER caused this so we can ignore it otherwise. Not using for now...
 function changedPosition(v){
 	var video = v[0];
 	var videoTile = video.id.replace(VIDEO_BASE_TAG, "");
-	var srcitems = video.src.split("/");
+	var srcitems = getVideoSource(video).split("/");
 	
 	var msg = {
 		videoTile: videoTile,
-		videoPosition: video.currentTime,
+		videoPosition: currentPosition(video),
 		videoName: srcitems[srcitems.length-1].replace(".mp4",""),
 		isPaused: video.paused,
 		action: Event.VideoPositionChange
@@ -436,6 +443,7 @@ function monitor_video_keydown(control) {
 	var x = control.attr("data-panelNumber");
 
 	var next_video = x;
+	g_video_item = x;
 
 	var msg = {
 		message: x,
@@ -445,106 +453,16 @@ function monitor_video_keydown(control) {
 	send_msg(msg);
 
 	switch (getKeyValue()) {
-		case KeyCode.ToggleAllPause:  	toggle_all(true); break;
+		case KeyCode.ToggleAllPause:	toggle_all(true); break;
 		case KeyCode.ToggleMute: 		vid_toggle_mute(x); break;
 		case KeyCode.TogglePause: 		play_pause(x); break;
-		case KeyCode.SwitchVideo: 
-			if (x > 0) {
-				switch_video(x);
-			}
-			break;
-		case KeyCode.Left: 
-			next_video = ((x == 1) || (x == 3)) ? x - 1 : x;
-			break;
-		case KeyCode.Up: 
-			next_video = ((x < 2)) ? x : x - 2;
-			break;
-		case KeyCode.Right: 
-			next_video = ((x == 0) || (x == 2)) ? x + 1 : x;
-			break;
-		case KeyCode.Down: 
-			next_video = ((x == 0) || (x == 1)) ? x + 2 : 100; //go to menu items
-			break;
-	}
-	if (next_video != 100) {
-		var control = findVideo(next_video);
-		setFocus(control);
-	} else {
-		var item_id = "menu_item_" + g_menu_item;
-		var control = document.getElementById(item_id);
-		setFocus(control);
-	}
-	
-	g_video_item = x;
-}
-
-function switch_video(x) {
-	var vid_name_src = "div_vid_tile_src_id_" + x;
-
-	var video = findVideo(x);
-	var video_0 = findVideo(0);
-
-	var video_src = document.getElementById(vid_name_src);
-	var video_0_src = document.getElementById('div_vid_tile_src_id_0');
-
-	video.pause();
-	video_0.pause();
-	var video_src_tmp = video_src.src;
-	var video_0_src_tmp = video_0_src.src;
-
-	video_src.src = video_0_src_tmp;
-	video_0_src.src = video_src_tmp;
-
-	video_0.load();
-	video.load();
-	video_0.play();
-	video.play();
-}
-
-function play_pause(x) {
-	var video = findVideo(x);
-
-	if (video.paused) {
-		console.log('play');
-		video.play();
-	} else {
-		console.log('pause');
-		video.pause();
+		case KeyCode.SwitchVideo:  		if (x > 0) { switch_video(x); } break;
 	}
 }
 
 function monitor_menu_keydown(control) {
 	var x = Number(control.attr("data-panelNumber"));
 	var next_item = x;
-
-	switch (getKeyValue()) {
-		case KeyCode.Left:
-			next_item = (x > 0) ? x - 1 : x;
-			break;
-		case KeyCode.Up: 
-			next_item = 200;
-			break;
-		case KeyCode.Right: 
-			next_item = (x < 5) ? x + 1 : x;
-			break;
-		case KeyCode.Down: 
-			next_item = 100; //move down to image tiles
-			break;
-	}
-
-	if (next_item == 100) { //move down to image tiles
-		var tile_name = "div_tile_img_id_0";
-		var control = document.getElementById(tile_name);
-		setFocus(control);
-	} else if (next_item == 200) { //move up to video tiles
-		var control = findVideo(g_video_item);
-		setFocus(control);
-	} else {
-		var item_id = "menu_item_" + next_item;
-		var menu_item = document.getElementById(item_id);
-		process_menu_items($(menu_item));
-	}
-
 	g_menu_item = x;
 }
 
@@ -558,45 +476,15 @@ function process_menu_items(control) {
 
 function update_tiles(menuItem) {
 	
-	var tileGroup = null;
-
-	switch (menuItem) {
-		case 0:
-			tileGroup = tileGroup0; //watch now
-			g_tile_group = 0;
-			break;
-		case 1:
-			tileGroup = tileGroup1; //sports
-			g_tile_group = 1;
-			break;
-		case 2:
-			tileGroup = tileGroup2; //stats
-			g_tile_group = 2;
-			break;
-		case 3:
-			tileGroup = tileGroup3; //stadium
-			g_tile_group = 3;
-			break;
-		case 4:
-			tileGroup = tileGroup4; //4K
-			g_tile_group = 4;
-			break;
-		case 5:
-			tileGroup = tileGroup5; //Games
-			g_tile_group = 5;
-			break;
-	}
-
-    if (!tileGroup)
-        return ;
+	g_tile_group = menuItem;
+	var tileGroup = tileGroups[menuItem];
 
     // All this is doing is changing aroung the URLS for the current videos in the little tiles
 	for (var idx = 0; idx < tileGroup.length; idx++) {
 		var r = tileGroup[idx];
-		var tileName = "div_tile_img_id_" + idx;
-		var imgTile = document.getElementById(tileName);
+		var imgTile = $("#div_tile_img_id_" + idx);
 		var imgName = "./image/" + r + ".jpg";
-		imgTile.style.backgroundImage = "url(" + imgName + ")";
+		imgTile.css("backgroundImage", "url(" + imgName + ")");
 	}
 }
 
@@ -613,6 +501,7 @@ function getMenuElementId(msg) {
 function findMenu(msg){
 	if(isJqueryItem(msg))
 		return msg;
+	
 	var search = "#" + getMenuElementId(msg);
 	var value = $(search);
 	return (value.length) ? $(value[0]): null;
@@ -620,29 +509,5 @@ function findMenu(msg){
 
 function monitor_tile_key_down(x) {
 	var nextTile = x;
-
-	switch (getKeyValue()) {
-		case KeyCode.Left:
-			nextTile = (x > 0) ? x - 1 : x;
-			break;
-		case KeyCode.Up:
-			nextTile = 100; //go to menu items
-			break;
-		case KeyCode.Right:
-			nextTile = (x < 9) ? x + 1: x;
-		    break;
-		case KeyCode.Down:
-			nextTile = x;
-			break;
-	}
-
-	if (nextTile !== 100) {
-		var control = $("#div_tile_img_id_" + nextTile);
-		setFocus(control);
-	} else {
-		var control = $("#menu_item_" + g_menu_item);
-		setFocus(control);
-	}
-	
 	g_tile_item = x;
 }

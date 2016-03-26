@@ -14,38 +14,70 @@ $(document).ready(() => {
 });
 
 function init() {
-    attachToControls();
+    attachToSocket();
+    mapPageKeyPresses();
+	attachToControls();
 
-    socket = new WebSocket('ws://localhost:9000/');
-    console.log("websocket server IP:" + websocket_server_ip);
-
-    socket.addEventListener("message", onMessage, false);
-
-    document.addEventListener("keydown", function(e) {
-        switch (getKeyValue(e)) {
-            case KeyCode.ToggleFullScreen:
-                toggleFullScreen();
-                break;
-            case KeyCode.ReloadPage:
-                location.reload();
-                break;
-            case KeyCode.PlayVideos:
-                for (var idx = 0; idx < 6; idx++) {
-                    var video = findVideo(idx);
-                    video.play();
-                }
-                break;
-            case KeyCode.ChangeDivider:
-                change_divider();
-                break;
-        }
-    }, false);
-
-    var control = document.getElementById("div_vid_tile_id_0");
-	setFocus(control);
+	setFocus($("#div_vid_tile_id_0"));
 
     vid_toggle_mute(0); //unmute vid 0 
     toggle_all(true); //start playing all videos
+	
+	window.setInterval(send_AllVideoStatus, REFRESH_CLIENT_INTERVAL);
+}
+
+function mapPageKeyPresses() {
+    var pagekeymap = [
+		{key:KeyCode.ToggleFullScreen, 	func:toggleFullScreen},
+		{key:KeyCode.ReloadPage, 		func:() => { location.reload(); }},
+		{key:KeyCode.PlayVideos, 		func:playVideos},
+		{key:KeyCode.ChangeDivider,		func:change_divider}
+	];
+
+    mapKeyPresses($(document), pagekeymap);
+}
+
+function attachToSocket() {
+    console.log("websocket server IP:" + websocket_server_ip);
+    socket = new WebSocket('ws://' + websocket_server_ip + ':9000/');
+    socket.addEventListener("message", onMessage, false);
+}
+
+function send_AllVideoStatus() {
+	// This allows us to NOT tell the clients that the server videos are paused at the moment
+	if(!STOP_WHEN_FULLSCREEN && g_video_full_screen_mode)
+		return;
+	
+    // Find the current videos
+    var tiles = $('.vid_tiles:visible').find('.video_tile');
+
+	var msg = {
+		action: Event.BroadcastServerStatus2,
+		videos: []
+	};
+
+    // For each video found, send the name and current position of each video
+    for (var idx = 0; idx < tiles.length; idx++) {
+        var video = tiles[idx];
+        var videoTile = video.id.replace(VIDEO_BASE_TAG, "");
+		var srcitems = getVideoSource(video).split("/");
+		
+        var videoInfo = {
+            videoTile: videoTile,
+            videoPosition: currentPosition(video),
+			videoName: srcitems[srcitems.length-1].replace(".mp4",""),
+			isPaused: video.paused
+        };
+		msg.videos.push(videoInfo);
+    }
+	send_msg(msg);
+}
+
+function playVideos(){
+	for (var idx = 0; idx < 6; idx++) {
+		var video = findVideo(idx);
+		video.play();
+	}
 }
 
 function draw_video(x, y) {
@@ -142,26 +174,27 @@ function toggle_all(e) {
 }
 
 function onMessage(evt) {
-    var msg = JSON.parse(evt.data); //PHP sends Json data
-	
+	var msg = JSON.parse(evt.data); //PHP sends Json data
+
 	if(msg === null)
 		return;
 	
+    // If the message is from this client just ignore it
+    if (msg.clientId === getClientId())
+        return;
+
 	var strmsg = JSON.stringify(msg);
 	console.log("tv receive:" + strmsg);
 
     switch (msg.action) {
         case Event.video_events:
-            monitor_video_message(msg.message, msg.name);
-            break;
-        case Event.dragdrop:
-            monitor_touch_message(msg);
+            monitor_video_message(msg.message, msg.name, msg.videoPosition);
             break;
 		case Event.stitch_events:
 			draw_video(msg.message, msg.name);
 			break;
         case Event.stitch_split_8k:
-            monitor_video_message(6, msg.name);
+            monitor_video_message(6, msg.name, msg.videoPosition);
             break;
         case Event.seek_time:
             g_current_time = msg.name;
@@ -171,26 +204,12 @@ function onMessage(evt) {
     }
 }
 
-function monitor_touch_message(msg) {
-    var type = msg.type; //message type
-    var vid_tile = msg.message; //vid tile
-    var vid_src = msg.name; //new vid source
-    var vid_name = "div_vid_tile_id_" + vid_tile;
-    var video = document.getElementById(vid_name);
-
-    video.pause();
-    video.src = vid_src;
-    video.play();
+function process_video_items(control) {
+	setFocus(control);
+    g_video_item = Number(control.attr("data-panelNumber"));
 }
 
-function process_video_items(x) {
-    var item_id = "div_vid_tile_id_" + x;
-    var control = document.getElementById(item_id);
-    control.focus();
-    g_video_item = x;
-}
-
-function monitor_video_message(x, key) {
+function monitor_video_message(x, key, videoPosition) {
     var next_video = x;
 
     g_video_item = x;
@@ -204,9 +223,9 @@ function monitor_video_message(x, key) {
             break;
         case KeyCode.StitchVideo:
             if (g_video_full_screen_mode == false) {
-                toggle_full_screen_video(x, g_video_full_screen_mode);
+                toggle_full_screen_video(x, g_video_full_screen_mode, videoPosition);
             } else {
-                toggle_full_screen_video(g_vid_full_screen, g_video_full_screen_mode);
+                toggle_full_screen_video(g_vid_full_screen, g_video_full_screen_mode, videoPosition);
             }
             break;
         case KeyCode.TogglePause:
@@ -217,46 +236,11 @@ function monitor_video_message(x, key) {
                 switch_video(x);
             }
             break;
-        case KeyCode.Left:
-            if ((x == 2) || (x == 4) || (x == 5)) {
-                next_video = x - 1;
-            } else {
-                next_video = x;
-            }
-            break;
-        case KeyCode.Up:
-            if ((x == 0) || (x == 1)) {
-                next_video = x - 1;
-            } else if (x == 5) {
-                next_video = 0;
-            } else {
-                next_video = x - 2;
-            }
-            break;
-        case KeyCode.Right:
-            if ((x == 0) || (x == 2)) {
-                next_video = x + 1;
-            } else {
-                next_video = x;
-            }
-            break;
-        case KeyCode.Down:
-            if ((x == 0) || (x == 1)) {
-                next_video = x + 2;
-            } else {
-                next_video = x;
-            }
-            break;
-    }
-
-    if (next_video != 100) {
-        var tile_name = "div_vid_tile_id_" + next_video;
-        var img_tile = document.getElementById(tile_name);
-        img_tile.focus();
     }
 }
 
-function monitor_video_keydown(x) {
+function monitor_video_keydown(video) {
+	var x = Number(video.attr("data-panelNumber"));
     var next_video = x;
 
     g_video_item = x;
@@ -265,14 +249,14 @@ function monitor_video_keydown(x) {
         case KeyCode.PlayVideos:
             toggle_all(true);
             break;
-        case PlayVideos.ToggleMute:
+        case KeyCode.ToggleMute:
             vid_toggle_mute(x);
             break;
         case KeyCode.StitchVideo:
             if (g_video_full_screen_mode == false) {
-                toggle_full_screen_video(x, g_video_full_screen_mode);
+                toggle_full_screen_video(x, g_video_full_screen_mode, currentPosition(video));
             } else {
-                toggle_full_screen_video(g_vid_full_screen, g_video_full_screen_mode);
+                toggle_full_screen_video(g_vid_full_screen, g_video_full_screen_mode, currentPosition(video));
             }
             break;
         case KeyCode.TogglePause:
@@ -283,40 +267,6 @@ function monitor_video_keydown(x) {
                 switch_video(x);
             }
             break;
-        case KeyCode.Left:
-            if ((x == 1) || (x == 3)) {
-                next_video = x - 1;
-            } else {
-                next_video = x;
-            }
-            break;
-        case KeyCode.Up:
-            if ((x < 2)) {
-                next_video = x;
-            } else {
-                next_video = x - 2;
-            }
-            break;
-        case KeyCode.Right:
-            if ((x == 0) || (x == 2)) {
-                next_video = x + 1;
-            } else {
-                next_video = x;
-            }
-            break;
-        case KeyCode.Down:
-            if ((x == 0) || (x == 1)) {
-                next_video = x + 2;
-            } else {
-                next_video = x;
-            }
-            break;
-    }
-
-    if (next_video != 100) {
-        var tile_name = "div_vid_tile_id_" + next_video;
-        var control = document.getElementById(tile_name);
-        control.focus();
     }
 }
 
@@ -325,7 +275,7 @@ function full_screen() {
     toggle_full_screen_video(g_video_item, g_video_full_screen_mode);
 }
 
-function toggle_full_screen_video_canvas(x, fs_mode) {
+function toggle_full_screen_video_canvas(x, fs_mode, videoPosition) {
     var vid_canvas = document.getElementById("vid_canvas");
 
     if (fs_mode == false) {
@@ -351,7 +301,7 @@ function toggle_full_screen_video_canvas(x, fs_mode) {
     }
 }
 
-function toggle_full_screen_video(x, fs_mode) {
+function toggle_full_screen_video(x, fs_mode, videoPosition) {
     var vid_id_name = "id_vid" + 7;
     var vid_class_name = "vid" + 7;
     var vid_name = "div_vid_tile_id_" + 7;
@@ -370,6 +320,9 @@ function toggle_full_screen_video(x, fs_mode) {
         document.getElementById(vid_id_name).classList.add("full_screen");
         vid_toggle_mute(x);
         video.play();
+		if(videoPosition != null) {
+			video.currentTime = videoPosition + .100; // Add a slight adjustment
+		}
     } else {
         console.log('fs: false');
         toggle_all(false); //pause
@@ -385,64 +338,5 @@ function toggle_full_screen_video(x, fs_mode) {
         document.getElementById(vid_id_name).classList.remove("full_screen");
         document.getElementById(vid_id_name).classList.add(vid_class_name);
         toggle_all(true);
-    }
-}
-
-function change_source_full_screen(x) {
-    var vid_name = "div_vid_tile_id_" + 7;
-    var video = document.getElementById(vid_name);
-    var str_trim;
-
-    if (x == 6) {
-        str_trim = 21;
-    } else {
-        str_trim = 22;
-    }
-
-    var vid_tile = "div_vid_tile_src_id_" + x;
-    var video_tile = document.getElementById(vid_tile);
-    var video_src = video_tile.getAttribute("src");
-    console.log("video full screen src orig:" + video_src);
-    console.log("video src_full_screen:" + video_src.substring(str_trim));
-
-    var vid_src = video_src.substring(str_trim);
-    video.src = "videos/stadium_tv/4K/" + vid_src;
-    console.log("full screen video source: " + video.src);
-}
-
-function switch_video(x) {
-    var vid_name = "div_vid_tile_id_" + x;
-    var vid_name_src = "div_vid_tile_src_id_" + x;
-
-    var video = document.getElementById(vid_name);
-    var video_0 = document.getElementById('div_vid_tile_id_0');
-
-    var video_src = document.getElementById(vid_name_src);
-    var video_0_src = document.getElementById('div_vid_tile_src_id_0');
-
-    video.pause();
-    video_0.pause();
-    var video_src_tmp = video_src.src;
-    var video_0_src_tmp = video_0_src.src;
-
-    video_src.src = video_0_src_tmp;
-    video_0_src.src = video_src_tmp;
-
-    video_0.load();
-    video.load();
-    video_0.play();
-    video.play();
-}
-
-function play_pause(x) {
-    var vid_name = "div_vid_tile_id_" + x;
-    var video = document.getElementById(vid_name);
-
-    if (video.paused) {
-        console.log('play');
-        video.play();
-    } else {
-        console.log('pause');
-        video.pause();
     }
 }

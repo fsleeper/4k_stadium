@@ -11,64 +11,51 @@ $(document).ready(() => {
 });
 
 function init() {
-    attachToControls();
+    attachToSocket();
+    mapPageKeyPresses();
+	attachToControls();
 
-    socket = new WebSocket('ws://' + websocket_server_ip + ':9000/');
-    console.log("websocket server IP:" + websocket_server_ip);
-
-    document.addEventListener("keydown", function(e) {
-        switch (getKeyValue(e)) {
-            case KeyCode.ToggleFullScreen:
-                toggleFullScreen();
-                break;
-            case KeyCode.ReloadPage:
-                location.reload();
-                break;
-            case KeyCode.PlayVideos:
-                for (var idx = 0; idx < 6; idx++) {
-                    var video = findVideo(idx);
-                    video.play();
-                }
-                break;
-        }
-    }, false);
-
-    var img_tile_0 = document.getElementById("div_vid_tile_id_0");
-    img_tile_0.focus();
+	setFocus($("#div_vid_tile_id_0"));
 
     vid_toggle_mute(0); //unmute vid0
     toggle_all(true); //start playing all videos
-
-    var new_vid = null;
 
     $('html, body').on('touchstart touchmove', function(e) {
         //prevent native touch activity like scrolling
         e.preventDefault();
     });
 
-    var msg_id;
+    var topVideo = document.getElementById("div_vid_tile_id_0");
 
-    var vid_tile = document.getElementById("div_vid_tile_id_0");
-
-    $("#stitch_toggle").bind('touchstart touchend touchmove mousedown touchcancel', function(e) {
+    $("#stitch_toggle").bind('touchstart mousedown', function(e) {
         e.stopPropagation();
         e.preventDefault();
-        if (vid_tile.paused || vid_tile.ended) {
+		
+        if (topVideo.paused || topVideo.ended) {
             return false;
         }
         console.log("stitch2 " + e.type);
-        if (e.type == "touchstart") {
+        if (e.type == "touchstart" || e.type == "mousedown") {
             toggle_stitch_mode();
         }
     });
 
     var time_touch;
-
+	var isActive = false;
+	
     $("#vid0_tile, #rectangle_div").bind({
         touchstart: function(e) {
-            if (vid_tile.paused || vid_tile.ended) {
+            if (topVideo.paused || topVideo.ended) {
                 return false;
             }
+            console.log('touchstart');
+            time_touch = new Date();
+        },
+        mousedown: function(e) {
+            if (topVideo.paused || topVideo.ended) {
+                return false;
+            }
+			isActive = !isActive;
             console.log('touchstart');
             time_touch = new Date();
         },
@@ -86,6 +73,34 @@ function init() {
                         var msg = {
                             message: 0,
                             name: KeyCode.StitchVideo,
+							videoPosition: currentPosition(topVideo),
+                            action: Event.stitch_split_8k
+                        };
+                        send_msg(msg);
+                        g_video_full_screen_mode = false;
+                    } else {
+                        select_stitch_event_area(e);
+                        g_video_full_screen_mode = true;
+                    }
+                }
+            } else {
+                console.log('swipe');
+            }
+        },
+        mouseup: function(e) {
+            console.log('touchend');
+            g_current_time_update = false;
+            var time_diff = new Date() - time_touch;
+            if (time_diff < 300) {
+                console.log('tap');
+                if (g_8k_stitch_mode == true) {
+                    toggle_stitch_mode();
+                } else {
+                    if (g_video_full_screen_mode == true) {
+                        var msg = {
+                            message: 0,
+                            name: KeyCode.StitchVideo,
+							videoPosition: currentPosition(topVideo),
                             action: Event.stitch_split_8k
                         };
                         send_msg(msg);
@@ -103,29 +118,28 @@ function init() {
         touchmove: function(e) {
             select_stitch_event_area(e);
         },
+        mousemove: function(e) {
+			if(!isActive)
+				return;
+            select_stitch_event_area(e);
+        },
     });
 
     $("#vid1_tile, #vid2_tile, #vid3_tile, #vid4_tile, #vid5_tile").bind('touchstart mousedown', function(e) {
-        console.log("vid_box_event " + e.target.id);
-        switch (e.target.id) {
-            case "div_vid_tile_id_1": msg_id = 1; break;
-            case "div_vid_tile_id_2": msg_id = 2; break;
-            case "div_vid_tile_id_3": msg_id = 3; break;
-            case "div_vid_tile_id_4": msg_id = 4; break;
-            case "div_vid_tile_id_5": msg_id = 5; break;
-        }
+		var id = Number(this.id.replace("div_vid_tile_id_",""));
 
         if (g_8k_stitch_mode == true) {
             toggle_stitch_mode();
         } else {
             var msg = {
-                message: msg_id,
+                message: id,
                 name: KeyCode.StitchVideo,
+				videoPosition: currentPosition(topVideo),
                 action: Event.stitch_split_8k
             };
             send_msg(msg);
 
-            vid_toggle_mute(msg_id);
+            vid_toggle_mute(id);
             if (g_video_full_screen_mode == false) {
                 g_video_full_screen_mode = true;
             } else {
@@ -135,12 +149,90 @@ function init() {
     });
 }
 
+function onMessage(evt) {
+	
+	var msg = JSON.parse(evt.data); //PHP sends Json data
+
+	if(msg === null)
+		return;
+	
+    // If the message is from this client just ignore it
+    if (msg.clientId === getClientId())
+        return;
+
+	var strmsg = JSON.stringify(msg);
+	console.log("tv receive:" + strmsg);
+
+	switch (msg.action) {
+		case Event.BroadcastServerStatus2:
+			for(var idx in msg.videos){
+				var item = msg.videos[idx];
+				var video = findVideo(item);
+				if(video) { // Did we find a video?
+					
+					// Get the location where the old file is pointed to
+					var src = getVideoSource(video);
+
+					// Now just rip out the name
+					var names = src.split("/");
+					var name = names[names.length-1];
+					name = name.replace(".mp4","");
+					
+					// Build the new name
+					var newVideo = src.replace(name, item.videoName);
+					
+					// if the names are different we need to change the video
+					if(src !== newVideo) {
+						console.log("New Video: " + item.videoName + "  Curr Video: " + src);
+						video.src = newVideo;
+					}
+
+					// If the paused states are different we need to get these in synchronized
+					if(video.paused != item.isPaused)
+						if(item.isPaused)
+							video.pause();
+						else
+							video.play();
+						
+					var ct = currentPosition(video);
+					var diff = Math.abs(ct-item.videoPosition);
+					if(diff >= .5)
+						video.currentTime = item.videoPosition;
+				}
+			}
+			break;
+	}
+}
+
+function mapPageKeyPresses() {
+    var pagekeymap = [
+		{key:KeyCode.ToggleFullScreen, 	func:toggleFullScreen},
+		{key:KeyCode.ReloadPage, 		func:() => { location.reload(); }},
+		{key:KeyCode.PlayVideos, 		func:playVideos}
+	];
+
+    mapKeyPresses($(document), pagekeymap);
+}
+
+function attachToSocket() {
+    console.log("websocket server IP:" + websocket_server_ip);
+    socket = new WebSocket('ws://' + websocket_server_ip + ':9000/');
+    socket.addEventListener("message", onMessage, false);
+}
+
+function playVideos(){
+	for (var idx = 0; idx < 6; idx++) {
+		var video = findVideo(idx);
+		video.play();
+	}
+}
+
 function update_current_time() {
     var vid_tile = document.getElementById("div_vid_tile_id_0");
-    console.log("videoCurrentTime: " + vid_tile.currentTime);
+    console.log("videoCurrentTime: " + currentPosition(vid_tile));
     var msg = {
         message: 0,
-        name: vid_tile.currentTime,
+        name: currentPosition(vid_tile),
         action: Event.seek_time
     };
     send_msg(msg);
@@ -161,10 +253,16 @@ function select_stitch_event_area(e) {
         g_current_time_update = true;
     }
 
-    var first_touch = e.originalEvent.changedTouches[0] || e.originalEvent.touches[0];
+	if(e.originalEvent.changedTouches != null || e.originalEvent.touches != null){
+		var first_touch = e.originalEvent.changedTouches[0] || e.originalEvent.touches[0];
 
-    x = first_touch.pageX;
-    y = first_touch.pageY;
+		x = first_touch.pageX;
+		y = first_touch.pageY;
+	}
+	else{
+		x = e.originalEvent.clientX;
+		y = e.originalEvent.clientY;
+	}
 
     if ((x - 480) < 0) {
         x = 480;
@@ -196,9 +294,7 @@ function select_stitch_event_area(e) {
 
 function toggle_stitch_mode() {
     var stitch_graphic = document.getElementById("stitch_toggle");
-    var msg_val;
-    var msg_key;
-    var msg_type;
+    var vid_tile = document.getElementById("div_vid_tile_id_0");
 
     if (g_8k_stitch_mode == false) {
         if (g_video_full_screen_mode == false) {
@@ -208,13 +304,11 @@ function toggle_stitch_mode() {
             console.log("stitch expand");
             update_current_time(); //update current time for stitch video
             setTimeout(function() {
-                msg_val = true;
-                msg_key = KeyCode.StitchVideo; 
-                msg_type = Event.stitch_split_8k;
                 var msg = {
-                    message: msg_val,
-                    name: msg_key,
-                    action: msg_type
+                    message: true,
+					videoPosition: currentPosition(vid_tile),
+                    name: KeyCode.StitchVideo,
+                    action: Event.stitch_split_8k
                 };
                 send_msg(msg);
             }, 300);
@@ -231,13 +325,11 @@ function toggle_stitch_mode() {
         stitch_graphic.style.backgroundImage = "url(image/icon_contract.png)";
         console.log("stitch contract");
         setTimeout(function() {
-            msg_val = false;
-            msg_key = KeyCode.StitchVideo;
-            msg_type = Event.stitch_split_8k;
             var msg = {
-                message: msg_val,
-                name: msg_key,
-                action: msg_type
+                message: false,
+                name: KeyCode.StitchVideo,
+				videoPosition: currentPosition(vid_tile),
+                action: Event.stitch_split_8k
             };
             send_msg(msg);
         }, 500);
@@ -273,39 +365,22 @@ function toggle_all(e) {
     }
 }
 
-function toggleFullScreen() {
-    if (!document.fullscreenElement && // alternative standard method
-        !document.mozFullScreenElement && !document.webkitFullscreenElement) { // current working methods
-        if (document.documentElement.requestFullscreen) {
-            document.documentElement.requestFullscreen();
-        } else if (document.documentElement.mozRequestFullScreen) {
-            document.documentElement.mozRequestFullScreen();
-        } else if (document.documentElement.webkitRequestFullscreen) {
-            document.documentElement.webkitRequestFullscreen(Element.ALLOW_KEYBOARD_INPUT);
-        }
-    } else {
-        if (document.cancelFullScreen) {
-            document.cancelFullScreen();
-        } else if (document.mozCancelFullScreen) {
-            document.mozCancelFullScreen();
-        } else if (document.webkitCancelFullScreen) {
-            document.webkitCancelFullScreen();
-        }
-    }
-}
-
 function process_video_items(x) {
-    var item_id = "div_vid_tile_id_" + x;
-    var menu_element = document.getElementById(item_id);
-    menu_element.focus();
+	var control = x;
+	if(!isJqueryItem(control))
+		control = $("#div_vid_tile_id_" + x);
+	setFocus(control);
 }
 
-function monitor_video_keydown(x) {
+function monitor_video_keydown(video) {
+	var x = Number(video.attr("data-panelNumber"));
+	
     var next_video = x;
 
     var msg = {
         message: x,
         name: window.event.keyCode,
+		videoPosition: currentPosition(video),
         action: Event.video_events
     };
     send_msg(msg);
@@ -325,77 +400,7 @@ function monitor_video_keydown(x) {
                 switch_video(x);
             }
             break;
-        case KeyCode.Left:
-            if ((x == 1) || (x == 3)) {
-                next_video = x - 1;
-            } else {
-                next_video = x;
-            }
-            break;
-        case KeyCode.Up:
-            if ((x < 2)) {
-                next_video = x;
-            } else {
-                next_video = x - 2;
-            }
-            break;
-        case KeyCode.Right:
-            if ((x == 0) || (x == 2)) {
-                next_video = x + 1;
-            } else {
-                next_video = x;
-            }
-            break;
-        case KeyCode.Down:
-            if ((x == 0) || (x == 1)) {
-                next_video = x + 2;
-            } else {
-                next_video = 100; //go to menu items
-            }
-            break;
     }
-    if (next_video != 100) {
-        var tile_name = "div_vid_tile_id_" + next_video;
-        var control = document.getElementById(tile_name);
-        control.focus();
-    }
-
     g_video_item = x;
 }
 
-function switch_video(x) {
-    var vid_name = "div_vid_tile_id_" + x;
-    var vid_name_src = "div_vid_tile_src_id_" + x;
-
-    var video = document.getElementById(vid_name);
-    var video_0 = document.getElementById('div_vid_tile_id_0');
-
-    var video_src = document.getElementById(vid_name_src);
-    var video_0_src = document.getElementById('div_vid_tile_src_id_0');
-
-    video.pause();
-    video_0.pause();
-    var video_src_tmp = video_src.src;
-    var video_0_src_tmp = video_0_src.src;
-
-    video_src.src = video_0_src_tmp;
-    video_0_src.src = video_src_tmp;
-
-    video_0.load();
-    video.load();
-    video_0.play();
-    video.play();
-}
-
-function play_pause(x) {
-    var vid_name = "div_vid_tile_id_" + x;
-    var video = document.getElementById(vid_name);
-
-    if (video.paused) {
-        console.log('play');
-        video.play();
-    } else {
-        console.log('pause');
-        video.pause();
-    }
-}

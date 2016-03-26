@@ -1,6 +1,9 @@
 
 var VIDEO_BASE_TAG = "div_vid_tile_id_";
 var MENU_BASE_TAG = "menu_item_";
+var REFRESH_CLIENT_INTERVAL = 1500;
+var STOP_WHEN_FULLSCREEN = false;
+
 var clientId = null;
 
 
@@ -13,6 +16,7 @@ function getClientId() {
 function send_msg(msg) {
     if (msg.clientId == null)
         msg.clientId = getClientId();
+	
     var strmsg = JSON.stringify(msg);
 
     console.log("Send:", strmsg);
@@ -33,9 +37,6 @@ String.prototype.format = function() {
 }
 
 function getSiteRoot(){
-	if(isRunningFromServer)
-		return "";
-		
     var rootPath = window.location.protocol + "//" + window.location.host + "/";
 	
 	var path = window.location.pathname;
@@ -65,7 +66,6 @@ function getVideoElementId(msg) {
 	var value =  VIDEO_BASE_TAG+getId(msg);
 	return value;
 }
-
 
 function isJqueryItem(control){
 	return control.context != null;
@@ -134,27 +134,73 @@ function getKeyValue(sourceCode){
 
 function attachToControls() {
     $('.handlevideo')
-		.focus(function () { process_video_items($(this)); })
-		.mouseover(function () { process_video_items($(this)); })
-		.keydown(function () { monitor_video_keydown($(this)); });
-    //videos.on("seeked", function () { changedPosition($(this)); });
+		.focus		(function () { process_video_items($(this)); })
+		.mouseover	(function () { process_video_items($(this)); })
+		.keydown	(function () { monitor_video_keydown($(this)); });
+		//.seeked	(function () { changedPosition($(this)); });
 
     $('.menuitem')
-		.focus(function () { process_menu_items($(this)); })
-		.mouseover(function () { process_menu_items($(this)); })
-		.keydown(function () { monitor_menu_keydown($(this)); });
+		.focus		(function () { process_menu_items($(this)); })
+		.mouseover	(function () { process_menu_items($(this)); })
+		.keydown	(function () { monitor_menu_keydown($(this)); });
+}
+
+function change_source_full_screen(x) {
+    var targetVideo = findVideo(7);
+	var srcVideo = findVideo(x);
+    var srcVideoPath = getVideoSource(srcVideo);
+	
+	if(srcVideoPath.indexOf("4K")==-1){
+		var names = srcVideoPath.split("/");
+		var videoName = names[names.length-1];
+		srcVideoPath = "videos/stadium_tv/4K/" + videoName;
+	}
+    targetVideo.src = srcVideoPath;
+    console.log("full screen video source: " + srcVideoPath);
+}
+
+function switch_video(x) {
+    var video = findVideo(x);
+    var video_0 = findVideo("0");
+
+    video.pause();
+    video_0.pause();
+	
+    var video_src_tmp = getVideoSource(video);
+    var video_0_src_tmp = getVideoSource(video_0); 
+
+    video.src = video_0_src_tmp;
+    video_0.src = video_src_tmp;
+
+    video_0.load();
+    video.load();
+    video_0.play();
+    video.play();
+}
+
+function play_pause(x) {
+	var video = findVideo(x);
+
+	if (video.paused) {
+		console.log('play');
+		video.play();
+	} else {
+		console.log('pause');
+		video.pause();
+	}
+}
+
+function currentPosition(video){
+	return video == null ? 0 : video.currentTime == null ? video.context.currentTime : video.currentTime;
 }
 
 function getVideoSource(video){
-	var src =  video.getAttribute("src");
-	
+	src =  video.getAttribute("src");
 	if(src == null)
 		src = video.currentSrc;
 	
-	if(isRunningFromServer){
-		var root = getSiteRoot();
-		src = src.replace(root, "");
-	}
+	var root = getSiteRoot();
+	src = src.replace(root, "");
 		
 	return src;
 }
@@ -229,6 +275,7 @@ var ClientMessage = {
 
 var Event = {
 	BroadcastServerStatus: 	"BroadcastServerStatus",
+	BroadcastServerStatus2: "BroadcastServerStatus2",
 	VideoPositionChange:	"VideoPositionChange",
 	video_events2: 			"video_events2",
 	video_events: 			'video_events',
